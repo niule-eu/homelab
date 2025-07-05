@@ -1,0 +1,47 @@
+{
+    "build": {
+        "dockerfile": "Containerfile",
+        "context": ".",
+        "args": {
+            "WORKDIR": "/workspaces/${localWorkspaceFolderBasename}",
+            "USERID": "2000",
+            "GROUPID": "2000",
+            "USERNAME": "${localEnv:USER}"
+        },
+        "options": [
+            "--build-arg-file=.devcontainer/argfile.conf"
+        ]
+    },
+    "workspaceMount": "",
+    "runArgs": [
+        "--name", "${localWorkspaceFolderBasename}_dc",
+        "--volume", "${localWorkspaceFolder}:/workspaces/${localWorkspaceFolderBasename}:Z",
+        "--volume", "${localEnv:HOME}/.ssh:/home/${localEnv:USER}/.ssh:Z",
+        "--volume", "${localEnv:HOME}/.config/sops/age:/home/${localEnv:USER}/.config/sops/age:Z",
+        "--volume", "${devcontainerId}-bashhistory:/commandhistory:Z,U",
+        "--volume", "/run/user/1000/podman/podman.sock:/run/user/2000/podman/podman.sock:z",
+        "--userns", "keep-id:uid=2000,gid=2000",
+        "--hostname", "${localWorkspaceFolderBasename}-dc",
+        "--security-opt", "label:type:container_runtime_t",
+        "--env", "GOPATH=/home/${localEnv:USER}/go",
+        "--env", "LOCAL_WORKSPACE_FOLDER=${localWorkspaceFolder}"
+    ],
+    "containerUser": "${localEnv:USER}",
+    "remoteUser": "${localEnv:USER}",
+    "updateRemoteUserUID": false,
+    "remoteEnv": {
+        "EDITOR": "code --wait"
+    },
+    "postCreateCommand": "entrypoint.nu",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "thenuprojectcontributors.vscode-nushell-lang",
+                "golang.go",
+                "hashicorp.terraform",
+                "redhat.vscode-yaml",
+                "pkl.pkl-vscode"
+            ]
+        }
+    }
+}

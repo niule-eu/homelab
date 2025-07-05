@@ -1,0 +1,17 @@
+target_triplet:
+  arch: 'x86_64'
+  os: 'linux'
+  abi: 'gnu'
+github_releases:
+- repo: sops
+  owner: getsops
+- repo: nushell
+  owner: nushell
+- repo: opentofu
+  owner: opentofu
+- repo: podman
+  owner: containers
+- repo: pkl
+  owner: apple
+  checksum: false
+golang: true

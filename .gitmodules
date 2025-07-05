@@ -1,0 +1,3 @@
+[submodule "hlcli"]
+	path = hlcli
+	url = git@github.com:niule-eu/hlcli.git

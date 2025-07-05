@@ -1,7 +1,8 @@
 import "package://pkg.pkl-lang.org/pkl-k8s/k8s@1.2.1#/K8sResource.pkl"
 import "package://pkg.pkl-lang.org/pkl-k8s/k8s@1.2.1#/api/apps/v1/Deployment.pkl"
+import "configmap.pkl"
 
-resources: Listing<K8sResource> = new {
+resources: Listing<K8sResource> = (configmap.resources) {
   new Deployment {
     metadata {
       name = "lldap"
@@ -29,12 +30,38 @@ resources: Listing<K8sResource> = new {
           containers {
             new {
               name = "lldap"
+              image = "ghcr.io/lldap/lldap:latest-alpine-rootless"
+              ports {
+                new {
+                  containerPort = 17170
+                  hostPort = 17170
+                }
+              }
               envFrom {
                 new {
                   configMapRef {
                     name = "lldap-env"
                   }
                 }
+                new {
+                  secretRef {
+                    name = "lldap-secrets"
+                  }
+                }
+              }
+              volumeMounts {
+                new {
+                  mountPath = "/data/:Z"
+                  name = "lldap-data"
+                }
+              }
+            }
+          }
+          volumes {
+            new {
+              name = "lldap-data"
+              persistentVolumeClaim {
+                claimName = "lldap-data"
               }
             }
           }

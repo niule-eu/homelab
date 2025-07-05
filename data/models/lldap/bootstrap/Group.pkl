@@ -1,0 +1,9 @@
+module lldap.bootstrap.User
+
+name : String
+
+output {
+  renderer = new JsonRenderer {
+    omitNullProperties = true
+  }
+}

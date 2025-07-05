@@ -1,0 +1,13 @@
+module lldap.bootstrap.Schema
+
+name : String
+attributeType : String(this == "STRING" || this == "INTEGER" || this == "JPEG" || this == "DATE_TIME")
+isList : Boolean = false
+isEditable : Boolean = false
+isVisible : Boolean = true
+
+output {
+  renderer = new JsonRenderer {
+    omitNullProperties = true
+  }
+}

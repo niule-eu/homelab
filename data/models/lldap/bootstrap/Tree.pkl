@@ -1,0 +1,55 @@
+open module lldap.bootstrap.Tree
+
+import "User.pkl"
+import "Group.pkl"
+import "Schema.pkl"
+
+groups : Listing<Group>?
+
+users : Listing<User>?
+
+group_schemas : Listing<Schema>?
+
+user_schemas : Listing<Schema>?
+
+output {
+  files = 
+    let (groups_files = 
+      groups.ifNonNull((l : Listing<Group>) -> 
+        l.fold(Map(), (acc : Map<String, FileOutput>, elem : Group) -> 
+          acc + Map("group-configs/\(elem.name).json", elem.output))
+      ) ?? Map())
+    let (users_files = 
+      users.ifNonNull((l : Listing<User>) ->
+        l.fold(Map(), (acc : Map<String, FileOutput>, elem : User) -> 
+          acc + Map("user-configs/\(elem.id).json", elem.output))
+      ) ?? Map())
+    let (group_schemas_files =
+      group_schemas.ifNonNull((l : Listing<Schema>) ->
+        Map(
+          "group-schemas/schema.json", 
+          new FileOutput {
+            value = group_schemas
+            renderer = new JsonRenderer { omitNullProperties = true }
+          })
+        ) ?? Map())
+    let (user_schemas_files =
+      user_schemas.ifNonNull((l : Listing<Schema>) ->
+        Map(
+          "user-schemas/schema.json", 
+          new FileOutput {
+            value = user_schemas
+            renderer = new JsonRenderer { omitNullProperties = true }
+          })
+        ) ?? Map())
+      (groups_files + users_files + group_schemas_files + user_schemas_files).toMapping()
+}
+
+// let (group_schemas_files
+//       when (group_schemas != null)
+//         Map( "user-schemas/schema.json", 
+//           new FileOutput { 
+//             value = user_schemas 
+//             renderer = new JsonRenderer { omitNullProperties = true} 
+//           })  
+//       else Map())

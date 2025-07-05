@@ -1,0 +1,19 @@
+module lldap.bootstrap.User
+
+id : String
+email : String
+password : String?
+displayName: String?
+firstName: String?
+lastName: String?
+avatar_file: String?
+avatar_url: String?
+gravatar_avatar: Boolean = false
+weserv_avatar: Boolean = false
+groups: Listing<String>?
+
+output {
+  renderer = new JsonRenderer {
+    omitNullProperties = true
+  }
+}

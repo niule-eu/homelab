@@ -1,0 +1,11 @@
+extends "../models/lldap/bootstrap/Tree.pkl"
+
+import "../models/lldap/bootstrap/User.pkl"
+
+users: Listing<User> = new {
+  new {
+    id = "user"
+    email = "user@gmail.com"
+    password = "password"
+  }
+}

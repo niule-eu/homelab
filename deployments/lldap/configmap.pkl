@@ -1,18 +1,54 @@
 import "package://pkg.pkl-lang.org/pkl-k8s/k8s@1.2.1#/K8sResource.pkl"
 import "package://pkg.pkl-lang.org/pkl-k8s/k8s@1.2.1#/api/core/v1/ConfigMap.pkl"
+import "package://pkg.pkl-lang.org/pkl-k8s/k8s@1.2.1#/api/core/v1/Secret.pkl"
 
 resources: Listing<K8sResource> = new {
+  new Secret {
+    metadata {
+      name = "lldap-secrets"
+    }
+    immutable = true
+    data {
+      ["LLDAP_LDAP_USER_PASS"] = read("sops:/lldap_ldap_user_pass").text.base64
+      // jq -n --arg val "`LC_ALL=C tr -dc 'A-Za-z0-9!#%&'\''()*+,-./:;<=>?@[\]^_{|}~' </dev/urandom | head -c 32`" '$val' | xargs -I {} sops set secrets.yaml '["lldap_jwt_secret"]' '"{}"'
+      ["LLDAP_JWT_SECRET"] = read("sops:/lldap_jwt_secret").text.base64
+      // jq -n --arg val "`LC_ALL=C tr -dc 'A-Za-z0-9!#%&'\''()*+,-./:;<=>?@[\]^_{|}~' </dev/urandom | head -c 32`" '$val' | xargs -I {} sops set secrets.yaml '["lldap_key_seed"]' '"{}"'
+      ["LLDAP_KEY_SEED"] = read("sops:/lldap_key_seed").text.base64
+    }
+  }
+  
   new ConfigMap {
     metadata {
       name = "lldap-env"
     }
     data {
-      ["UID"] = 1000
-      ["GID"] = 1000
+      ["UID"] = "1000"
+      ["GID"] = "1000"
       ["TZ"] = "Europe/Berlin"
       ["LLDAP_LDAP_BASE_DN"] = "dc=local,dc=niule,dc=eu"
-      ["LLDAP_LDAP_USER_PASS"] = 
+      ["LLDAP_DATABASE_URL"] = "sqlite:///data/users.db?mode=rwc"
+      ["LLDAP_HTTP_PORT"] = "17170"
     }
+  }
+
+  new ConfigMap {
+    metadata {
+      name = "lldap-bootstrap"
+    }
+    data =
+      let (user_configs = 
+        let (r = read*("../../data/iam/user-configs/*.json"))
+          r.toMap().map((k, v) -> Pair(k.split("iam/")[1].replaceAll("/", "_"), v.text)))
+      let (group_configs = 
+        let (r = read*("../../data/iam/group-configs/*.json"))
+          r.toMap().map((k, v) -> Pair(k.split("iam/")[1].replaceAll("/", "_"), v.text)))
+      let (user_schemas = 
+        let (r = read*("../../data/iam/user-schemas/*.json"))
+          r.toMap().map((k, v) -> Pair(k.split("iam/")[1].replaceAll("/", "_"), v.text)))
+      let (group_schemas = 
+        let (r = read*("../../data/iam/group-schemas/*.json"))
+          r.toMap().map((k, v) -> Pair(k.split("iam/")[1].replaceAll("/", "_"), v.text)))
+      (user_configs + group_configs + user_schemas + group_schemas).toMapping()
   }
 }
 

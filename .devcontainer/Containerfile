@@ -1,0 +1,134 @@
+# Download golang and extract to tmp
+FROM curlimages/curl:latest as golang
+
+# For github assets, and generally a good idea:
+# curl -H "Accept: application/octet-stream"
+
+ARG GOLANG_URL
+ARG GOLANG_HASH
+
+RUN <<EOF /bin/sh
+    set -eux
+    curl -H "Accept: application/octet-stream" -Lo go.tar.gz ${GOLANG_URL}
+    echo "${GOLANG_HASH} go.tar.gz" | sha256sum -c
+    tar -C /tmp/ -xzf go.tar.gz
+EOF
+
+# Download sops and move to /tmp
+FROM curlimages/curl:latest as sops
+
+ARG SOPS_URL
+ARG SOPS_HASH
+
+RUN <<EOF /bin/sh
+    set -eux
+    curl -H "Accept: application/octet-stream" -Lo sops ${SOPS_URL}
+    echo "${SOPS_HASH} sops" | sha256sum -c
+    mv sops /tmp/sops
+EOF
+
+# Download nushell and move to /tmp
+FROM curlimages/curl:latest as nushell
+
+ARG NUSHELL_URL
+ARG NUSHELL_HASH
+
+RUN <<EOF /bin/sh
+    set -eux
+    curl -H "Accept: application/octet-stream" -Lo nushell.tar.gz ${NUSHELL_URL}
+    echo "${NUSHELL_HASH} nushell.tar.gz" | sha256sum -c
+    tar -C /tmp/ -xzf nushell.tar.gz
+EOF
+
+# Download opentofu and move to /tmp
+FROM curlimages/curl:latest as opentofu
+
+ARG OPENTOFU_URL
+ARG OPENTOFU_HASH
+
+RUN <<EOF /bin/sh
+    set -eux
+    curl -H "Accept: application/octet-stream" -Lo opentofu.tar.gz ${OPENTOFU_URL}
+    echo "${OPENTOFU_HASH} opentofu.tar.gz" | sha256sum -c
+    tar -C /tmp/ -xzf opentofu.tar.gz
+EOF
+
+# Download podman-remote and move to /tmp
+FROM curlimages/curl:latest as podman-remote
+
+ARG PODMAN_URL
+ARG PODMAN_HASH
+
+RUN <<EOF /bin/sh
+    set -eux
+    curl -H "Accept: application/octet-stream" -Lo podman-remote.tar.gz ${PODMAN_URL}
+    echo "${PODMAN_HASH} podman-remote.tar.gz" | sha256sum -c
+    tar -C /tmp/ -xzf podman-remote.tar.gz
+EOF
+
+# Download pkl and move to /tmp
+FROM curlimages/curl:latest as pkl
+
+ARG PKL_URL
+
+RUN <<EOF /bin/sh
+    set -eux
+    curl -H "Accept: application/octet-stream" -Lo pkl ${PKL_URL}
+    chmod +x pkl
+    mv pkl /tmp/pkl    
+EOF
+
+FROM docker.io/eclipse-temurin:22.0.2_9-jdk-ubi9-minimal as java
+
+FROM fedora-minimal:42
+
+ARG USERID
+ARG GROUPID
+ARG USERNAME
+
+RUN dnf update -y && dnf install -y --setopt=install_weak_deps=False \
+    git \
+    bash-completion \
+    tar \
+    libguestfs \
+    bzip2 \
+    butane
+
+COPY --chown=root:root --chmod=0755 --from=golang /tmp/go /usr/local/go
+COPY --chown=root:root --chmod=0755 --from=sops /tmp/sops /usr/local/bin/
+COPY --chown=root:root --chmod=0755 --from=opentofu /tmp/tofu /usr/local/bin/
+COPY --chown=root:root --chmod=0755 --from=nushell /tmp/nu*/nu /usr/local/bin/
+COPY --chown=root:root --chmod=0755 --from=podman-remote /tmp/bin/podman* /usr/local/bin/podman-remote
+COPY --chown=root:root --chmod=0755 --from=pkl /tmp/pkl /usr/local/bin/
+COPY --chown=root:root --chmod=0755 --from=java  /opt/java /opt/java
+
+# create container user
+RUN <<EOF /bin/bash
+    set -eux
+    groupadd --gid ${GROUPID} ${USERNAME}
+    useradd --create-home --shell /bin/bash --uid ${USERID} --gid ${GROUPID} ${USERNAME}
+EOF
+
+# Add go to path and adjust permissons
+# Note the quotes around "EOF", they tell the container builder not to interpolate ARGs into the script
+RUN <<"EOF" /bin/bash -s ${USERNAME}
+    echo 'export PATH="/usr/local/go/bin:$PATH"' > /etc/profile.d/go_lang.sh
+    mkdir -p /home/$USERNAME/.config/sops/age
+    chown -R $USERNAME:$USERNAME /home/$USERNAME/.config/
+EOF
+
+
+# persist container user command history
+RUN <<EOF /bin/bash
+    set -eux
+    mkdir -p /commandhistory
+    touch /commandhistory/.bash_history
+    chown -R ${USERNAME} /commandhistory
+    echo "export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhistory/.bash_history" >> /home/${USERNAME}/.bashrc
+EOF
+
+USER $USERNAME
+
+ENV PATH="$PATH:/opt/java/openjdk/bin"
+
+COPY --chown=$USERNAME:$USERNAME --chmod=755 entrypoint.nu /home/$USERNAME/.local/bin/entrypoint.nu

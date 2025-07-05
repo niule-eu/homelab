@@ -1,0 +1,24 @@
+import "package://pkg.pkl-lang.org/pkl-k8s/k8s@1.2.1#/K8sResource.pkl"
+import "package://pkg.pkl-lang.org/pkl-k8s/k8s@1.2.1#/api/core/v1/ConfigMap.pkl"
+
+resources: Listing<K8sResource> = new {
+  new ConfigMap {
+    metadata {
+      name = "lldap-env"
+    }
+    data {
+      ["UID"] = 1000
+      ["GID"] = 1000
+      ["TZ"] = "Europe/Berlin"
+      ["LLDAP_LDAP_BASE_DN"] = "dc=local,dc=niule,dc=eu"
+      ["LLDAP_LDAP_USER_PASS"] = 
+    }
+  }
+}
+
+output {
+  value = resources
+  renderer = (K8sResource.output.renderer as YamlRenderer) {
+    isStream = true
+  }
+}

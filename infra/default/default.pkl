@@ -1,0 +1,70 @@
+extends "@fcos_butane/ButaneFcos.pkl"
+
+passwd {
+    users {
+        ["core"] {
+            name = "core"
+            groups {
+              "sudo"
+              "wheel"
+            }
+            when (core_password_hash != null) {
+              password_hash = core_password_hash
+            }
+            ssh_authorized_keys {
+              "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC9AaghNePDNxI//W6OX6Yp6gssMpDUzK+4XoUiXnRZE fedora-sway-atomic@niuleh.eu"
+            }
+        }
+    }
+}
+
+storage {
+  files {
+    when (hostname != null) {
+      ["/etc/hostname"] {
+        path = "/etc/hostname"
+        mode {
+          value = "0o644"
+        }
+        overwrite = true
+        contents {
+          inline = hostname
+        }
+      }
+    }
+    
+    when (disable_stub_listener) {
+      ["/etc/systemd/resolved.conf.d/disable-stub.conf"] {
+        path = "/etc/systemd/resolved.conf.d/disable-stub.conf"
+        mode {
+          value = "0o0644"
+        }
+        contents {
+          inline = read(path.drop(1)).text
+        }
+      }
+    }
+
+    when (nm_no_auto_default.length > 0) {
+      ["/etc/NetworkManager/conf.d/no-auto-default.conf"] {
+        path = "/etc/NetworkManager/conf.d/no-auto-default.conf"
+        mode {
+          value = "0o644"
+        }
+        contents {
+          inline = 
+            """
+            [main]
+            no-auto-default=\(nm_no_auto_default.join(","))
+            """
+        }
+    }
+    }
+  }
+  
+}
+
+hidden hostname : String? = null 
+hidden disable_stub_listener : Boolean = false
+hidden core_password_hash : String? = null
+hidden nm_no_auto_default : Listing<String> = new Listing {}

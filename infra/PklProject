@@ -1,0 +1,7 @@
+amends "pkl:Project"
+
+dependencies {
+  ["fcos_butane"] {
+    uri = "package://pkg.pkl-lang.org/github.com/niule-eu/fcos_butane.v1.6.0/fcos_butane.v1.6.0@0.2.2"
+  }
+}

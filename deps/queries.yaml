@@ -1,0 +1,15 @@
+- owner: getsops
+  repo: sops
+  pattern: 'linux.amd64$'
+  checksums_pattern: 'checksums.txt'
+- owner: apple
+  repo: pkl
+  pattern: linux-amd64
+- repo: opentofu
+  owner: opentofu
+  pattern: 'linux_amd64\.tar\.gz$'
+  checksums_pattern: 'SHA256SUMS$'
+- repo: podman
+  owner: containers
+  pattern: 'remote.*linux_amd64'
+  checksums_pattern: 'shasums'

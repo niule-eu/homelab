@@ -90,7 +90,6 @@ RUN dnf update -y && dnf install -y --setopt=install_weak_deps=False \
     git \
     bash-completion \
     tar \
-    libguestfs \
     bzip2 \
     butane
 

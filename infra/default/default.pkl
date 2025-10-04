@@ -4,6 +4,7 @@ passwd {
     users {
         ["core"] {
             name = "core"
+            uid = 1000
             groups {
               "sudo"
               "wheel"
@@ -19,7 +20,39 @@ passwd {
 }
 
 storage {
+  links {
+    when (enable_linger == true) {
+      ["/var/home/core/.config/systemd/user/sockets.target.wants/podman.socket"] {
+        path = "/var/home/core/.config/systemd/user/sockets.target.wants/podman.socket"
+        target = "/usr/lib/systemd/user/podman.socket"
+        user {
+          id = 1000
+        }
+        group {
+          id = 1000
+        }
+        hard = false
+      }
+    }
+  }
   files {
+    when (enable_linger == true) {
+      ["/var/lib/systemd/linger/core"] {
+        path = "/var/lib/systemd/linger/core"
+        user {
+          id = 0
+        }
+        group {
+          id = 0
+        }
+        mode {
+          value = "0o644"
+        }
+        contents {
+          inline = ""
+        }
+      }
+    }
     when (hostname != null) {
       ["/etc/hostname"] {
         path = "/etc/hostname"
@@ -68,3 +101,4 @@ hidden hostname : String? = null
 hidden disable_stub_listener : Boolean = false
 hidden core_password_hash : String? = null
 hidden nm_no_auto_default : Listing<String> = new Listing {}
+hidden enable_linger : Boolean = false

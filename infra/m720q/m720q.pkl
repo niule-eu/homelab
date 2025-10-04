@@ -8,6 +8,7 @@ local module_dir : String = (module_path.dropLastWhile((c : String) -> c != "/")
 hostname = "m720q"
 disable_stub_listener = true
 nm_no_auto_default = new {"eno1"}
+enable_linger = true
 
 storage {
   files {

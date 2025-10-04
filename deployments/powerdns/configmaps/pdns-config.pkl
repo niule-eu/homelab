@@ -1,0 +1,15 @@
+import "package://pkg.pkl-lang.org/pkl-k8s/k8s@1.2.1#/K8sResource.pkl"
+import "package://pkg.pkl-lang.org/pkl-k8s/k8s@1.2.1#/api/core/v1/ConfigMap.pkl"
+
+resources: Listing<K8sResource> = new {
+  new ConfigMap {
+    metadata {
+      name = "pdns-config"
+    }
+    data {
+      ["local-port.conf"] = """
+        local-port=5300
+        """
+    }
+  }
+}

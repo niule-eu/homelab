@@ -1,4 +1,5 @@
 extends "@fcos_butane/ButaneFcos.pkl"
+import "@fcos_butane/Storage.pkl"
 
 passwd {
     users {
@@ -19,11 +20,24 @@ passwd {
     }
 }
 
+systemd {
+  units {
+    ["docker.service"] {
+      name = "docker.service"
+      mask = true
+    }
+    ["docker.socket"] {
+      name = "docker.socket"
+      mask = true
+    }
+  }
+}
+
 storage {
   links {
     when (enable_linger == true) {
-      ["/var/home/core/.config/systemd/user/sockets.target.wants/podman.socket"] {
-        path = "/var/home/core/.config/systemd/user/sockets.target.wants/podman.socket"
+      ["/home/core/.config/systemd/user/sockets.target.wants/podman.socket"] {
+        path = "/home/core/.config/systemd/user/sockets.target.wants/podman.socket"
         target = "/usr/lib/systemd/user/podman.socket"
         user {
           id = 1000
@@ -34,6 +48,23 @@ storage {
         hard = false
       }
     }
+  }
+  when (enable_linger == true) {
+    directories = 
+      let (dir_parts = List(".config", "systemd", "user", "sockets.target.wants"))
+        dir_parts.foldIndexed(
+          Map(), 
+          (i, acc, elem) -> (
+            let (name = "/home/core/\(dir_parts.take(i + 1).join("/"))")
+              Map(name, new Storage.Directory {
+                group { id = 1000 }
+                user { id = 1000 }
+                mode { value = "0o755" }
+                path = name
+              }) + acc
+          )
+        )
+        .toMapping()
   }
   files {
     when (enable_linger == true) {

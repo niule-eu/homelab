@@ -1,0 +1,54 @@
+import "package://pkg.pkl-lang.org/pkl-k8s/k8s@1.2.1#/K8sResource.pkl"
+import "package://pkg.pkl-lang.org/pkl-k8s/k8s@1.2.1#/api/core/v1/ConfigMap.pkl"
+
+hidden zones_yaml_doc {
+  zones = new Listing {
+    new {
+      name = "infra.lan.niule.xyz"
+      cache_ttl_seconds = 60
+      target_port = 5300
+    }
+  }
+}
+
+resources: Listing<K8sResource> = new {
+  new ConfigMap {
+    metadata {
+      name = "coredns-config"
+    }
+    data {
+      ["zones.yaml"] = 
+        let (renderer = new YamlRenderer{ })
+          renderer.renderDocument(zones_yaml_doc)
+
+      ["zones.gompl"] = """
+        {{ define "IP" -}}
+          {{- if (coll.Has . "target_ip") -}}
+            {{ .target_ip -}}
+          {{ else -}}
+            {{ net.LookupIP (env.Getenv "POD_NAME") -}}
+          {{ end -}}
+        {{- end -}}
+
+        {{ range $zone := (datasource "zones").zones -}}
+        {{ $zone.name }} {
+          cache {{ $zone.cache_ttl_seconds }}
+          forward . {{ template "IP" $zone }}:{{ $zone.target_port }}
+          log
+          debug
+        }
+        {{ end }}
+        """
+
+      ["Corefile"] = """
+        import ./Corefile.d/*
+        
+        . {
+          cache 60
+          log
+          forward . 1.1.1.2 1.0.0.2
+        }
+        """
+    }
+  }
+}

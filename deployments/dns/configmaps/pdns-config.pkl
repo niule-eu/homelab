@@ -1,6 +1,8 @@
 import "package://pkg.pkl-lang.org/pkl-k8s/k8s@1.2.1#/K8sResource.pkl"
 import "package://pkg.pkl-lang.org/pkl-k8s/k8s@1.2.1#/api/core/v1/ConfigMap.pkl"
 
+hidden pdns_auth_port : Int = 5300
+
 resources: Listing<K8sResource> = new {
   new ConfigMap {
     metadata {
@@ -8,7 +10,7 @@ resources: Listing<K8sResource> = new {
     }
     data {
       ["local-port.conf"] = """
-        local-port=5300
+        local-port=\(pdns_auth_port)
         """
     }
   }

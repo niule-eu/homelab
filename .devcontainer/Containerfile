@@ -17,10 +17,6 @@ EOF
 # Download sops and move to /tmp
 FROM curlimages/curl:latest as sops
 
-GETSOPS_SOPS_TAG
-GETSOPS_SOPS_URL
-GETSOPS_SOPS_HASH
-
 ARG GETSOPS_SOPS_URL
 ARG GETSOPS_SOPS_HASH
 
@@ -71,6 +67,20 @@ EOF
 
 FROM docker.io/eclipse-temurin:22.0.2_9-jdk-ubi9-minimal as java
 
+# Download dnscontrol and move to /tmp
+FROM curlimages/curl:latest as dnscontrol
+
+ARG STACKEXCHANGE_DNSCONTROL_URL
+ARG STACKEXCHANGE_DNSCONTROL_HASH
+
+RUN <<EOF /bin/sh
+    set -eux
+    curl -H "Accept: application/octet-stream" -Lo dnscontrol.tar.gz ${STACKEXCHANGE_DNSCONTROL_URL}
+    echo "${STACKEXCHANGE_DNSCONTROL_HASH} dnscontrol.tar.gz" | sha256sum -c
+    tar -C /tmp/ -xzf dnscontrol.tar.gz
+    rm -rf dnscontrol.tar.gz
+EOF
+
 FROM fedora-minimal:42
 
 ARG USERID
@@ -90,6 +100,7 @@ COPY --chown=root:root --chmod=0755 --from=opentofu /tmp/tofu /usr/local/bin/
 COPY --chown=root:root --chmod=0755 --from=podman-remote /tmp/bin/podman* /usr/local/bin/podman-remote
 COPY --chown=root:root --chmod=0755 --from=pkl /tmp/pkl /usr/local/bin/
 COPY --chown=root:root --chmod=0755 --from=java  /opt/java /opt/java
+COPY --chown=root:root --chmod=0755 --from=dnscontrol /tmp/dnscontrol /usr/local/bin/
 
 # create container user
 RUN <<EOF /bin/bash
@@ -121,23 +132,27 @@ USER $USERNAME
 ENV PATH="$PATH:/opt/java/openjdk/bin"
 
 COPY <<EOF /home/$USERNAME/.config/containers/podman-connections.json
-{
-  "Connection": { 
-    "Default": "host",
-      "Connections": { 
-        "host": {
-          "URI": "unix://run/user/2000/podman/podman.sock"
-        }
-      }
-  },
-  "Farm": {}
-}
+    {
+      "Connection": { 
+        "Default": "host",
+          "Connections": { 
+            "host": {
+              "URI": "unix://run/user/2000/podman/podman.sock"
+            }
+          }
+      },
+      "Farm": {}
+    }
 EOF
 
 COPY <<EOF /home/$USERNAME/.bashrc.d/podman-alias
-alias podman='podman-remote'
+    alias podman='podman-remote'
 EOF
 
 COPY <<"EOF" /home/$USERNAME/.bashrc.d/gopath-bin
-export PATH=$PATH:$GOPATH/bin
+    export PATH=$PATH:$GOPATH/bin
+EOF
+
+COPY <<"EOF" /home/$USERNAME/.bashrc.d/dnscontrol-completion
+    eval "$(dnscontrol shell-completion bash)"
 EOF

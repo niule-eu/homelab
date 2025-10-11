@@ -1,0 +1,72 @@
+import "package://pkg.pkl-lang.org/pkl-k8s/k8s@1.2.1#/K8sResource.pkl"
+import "package://pkg.pkl-lang.org/pkl-k8s/k8s@1.2.1#/api/apps/v1/Deployment.pkl"
+import "configmaps/envoy-config.pkl" as envoyconfig
+
+hidden config_maps =
+  let (envoy_config = (envoyconfig.resources.toList()))
+    (envoy_config).toListing()
+
+resources: Listing<K8sResource> = (config_maps) {
+  new Deployment {
+    metadata {
+      name = "envoy"
+    }
+    spec {
+      replicas = 1
+      selector {
+        matchLabels {
+          ["app"] = "envoy"
+        }
+      }
+      strategy {
+        type = "Recreate"
+      }
+      template {
+        metadata {
+          labels {
+            ["app"] = "envoy"
+          }
+        }
+        spec {
+          hostNetwork = true
+          containers {
+            new {
+              name = "proxy"
+              image = "docker.io/envoyproxy/envoy:distroless-v1.35-latest"
+              securityContext {
+                capabilities {
+                  add {
+                    "CAP_NET_ADMIN"
+                    "CAP_NET_BIND_SERVICE"
+                  }
+                }
+              }
+              volumeMounts {
+                new {
+                  mountPath = "/etc/envoy/envoy.yaml:Z"
+                  name = "envoy-config"
+                  subPath = "envoy.yaml"
+                }
+              }
+            }
+          }
+          volumes {
+            new {
+              name = "envoy-config"
+              configMap {
+                name = "envoy-config"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+output {
+  value = resources
+  renderer = (K8sResource.output.renderer as YamlRenderer) {
+    isStream = true
+  }
+}

@@ -1,3 +1,4 @@
+---
 - owner: getsops
   repo: sops
   pattern: 'linux.amd64$'
@@ -13,3 +14,7 @@
   owner: containers
   pattern: 'remote.*linux_amd64'
   checksums_pattern: 'shasums'
+- repo: dnscontrol
+  owner: stackexchange
+  pattern: 'linux_amd64.tar.gz$'
+  checksums_pattern: 'checksums.txt'

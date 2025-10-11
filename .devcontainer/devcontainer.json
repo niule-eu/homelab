@@ -32,11 +32,9 @@
     "remoteEnv": {
         "EDITOR": "code --wait"
     },
-    "postCreateCommand": "entrypoint.nu",
     "customizations": {
         "vscode": {
             "extensions": [
-                "thenuprojectcontributors.vscode-nushell-lang",
                 "golang.go",
                 "hashicorp.terraform",
                 "redhat.vscode-yaml",

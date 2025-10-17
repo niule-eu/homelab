@@ -1,0 +1,13 @@
+amends "job.pkl"
+
+lego_domains {
+  "mydomain.example.com"
+  "*.mydomain.example.com"
+}
+lego_email = "mail@example.com"
+lego_ovh_application_key = "keykeykey"
+lego_ovh_application_secret = "secretsecretsecret"
+lego_ovh_consumer_key = "coonsumerkeyconsumerkey"
+lego_ovh_endpoint = "ovh-eu"
+
+pvc_import_from_source = "/path/to/volume.tar"

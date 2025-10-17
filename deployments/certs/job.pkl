@@ -1,0 +1,102 @@
+import "package://pkg.pkl-lang.org/pkl-k8s/k8s@1.2.1#/K8sResource.pkl"
+import "package://pkg.pkl-lang.org/pkl-k8s/k8s@1.2.1#/api/batch/v1/Job.pkl"
+import "package://pkg.pkl-lang.org/pkl-k8s/k8s@1.2.1#/api/core/v1/PersistentVolumeClaim.pkl"
+import "configmaps/lego-env.pkl" as legoenv
+
+hidden lego_email : String
+hidden lego_domains : Listing<String>
+hidden lego_ovh_application_key : String
+hidden lego_ovh_application_secret : String
+hidden lego_ovh_consumer_key : String
+hidden lego_ovh_endpoint : String
+
+hidden config_maps : Listing<K8sResource> =
+  let (
+    lego_env = new legoenv.LegoEnv { 
+      lego_env_ovh_application_key = lego_ovh_application_key
+      lego_env_ovh_application_secret = lego_ovh_application_secret
+      lego_env_ovh_consumer_key = lego_ovh_consumer_key
+      lego_env_ovh_endpoint =   lego_ovh_endpoint
+    }
+  )
+    lego_env.resources
+
+hidden pvc_import_from_source : String?
+
+hidden pvc = new Listing<K8sResource> {
+  when (pvc_import_from_source != null) {
+    new PersistentVolumeClaim {
+      metadata {
+        annotations {
+          ["volume.podman.io/import-source"] = pvc_import_from_source
+        }
+        name = "dot-lego"
+      }
+    }
+  }
+}
+
+
+resources: Listing<K8sResource> = new {
+  ...config_maps
+  ...pvc
+  new Job {
+    metadata {
+      name = "lego-job"
+    }
+    spec {
+      template {
+        metadata {
+          name = "lego-pod"
+        }
+        spec {
+          containers {
+            new {
+              name = "lego"
+              image = "docker.io/goacme/lego"
+              envFrom {
+                new {
+                  configMapRef {
+                    name = "lego-env"
+                    optional = false
+                  }
+                }
+              }
+              volumeMounts {
+                new {
+                  mountPath = "/.lego/:Z"
+                  name = "dot-lego"
+                }
+              }
+              args = (lego_domains.fold(new Listing {}, ((acc : Listing, elem : String) -> (acc) { "--domains"; elem } ))) {
+                "--dns"
+                "ovh"
+                "--email"
+                lego_email
+                "--accept-tos" // "-a"
+                "run"
+              }
+            }
+          }
+          volumes {
+            when (pvc_import_from_source == null) {
+              new {
+                name = "dot-lego"
+                persistentVolumeClaim {
+                  claimName = "dot-lego"
+                }
+              }  
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+output {
+  value = resources
+  renderer = (K8sResource.output.renderer as YamlRenderer) {
+    isStream = true
+  }
+}

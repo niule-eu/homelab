@@ -1,0 +1,23 @@
+import "package://pkg.pkl-lang.org/pkl-k8s/k8s@1.2.1#/K8sResource.pkl"
+import "package://pkg.pkl-lang.org/pkl-k8s/k8s@1.2.1#/api/core/v1/ConfigMap.pkl"
+
+class LegoEnv {
+  hidden lego_env_ovh_application_key : String
+  hidden lego_env_ovh_application_secret : String
+  hidden lego_env_ovh_consumer_key : String
+  hidden lego_env_ovh_endpoint : String
+
+  resources: Listing<K8sResource> = new {
+    new ConfigMap {
+      metadata {
+        name = "lego-env"
+      }
+      data {
+        ["OVH_APPLICATION_KEY"] = lego_env_ovh_application_key
+        ["OVH_APPLICATION_SECRET"] = lego_env_ovh_application_secret
+        ["OVH_CONSUMER_KEY"] = lego_env_ovh_consumer_key
+        ["OVH_ENDPOINT"] = lego_env_ovh_endpoint
+      }
+    }
+  }
+}

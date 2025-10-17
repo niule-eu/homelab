@@ -1,0 +1,10 @@
+[Unit]
+Requires=envoy-bridge-network.service envoy-macvlan-network.service
+
+[Kube]
+Yaml=/opt/envoy/envoy-deployment.yaml
+Network=systemd-envoy-macvlan:ip=172.16.13.2
+Network=systemd-envoy-bridge:ip=10.255.255.2
+
+[Install]
+WantedBy=multi-user.target default.target

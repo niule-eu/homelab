@@ -7,13 +7,56 @@ local module_dir : String = (module_path.dropLastWhile((c : String) -> c != "/")
 
 hostname = "m720q"
 disable_stub_listener = true
-nm_no_auto_default = new {"eno1"}
+nm_no_auto_default = new {}
 enable_linger = true
 
 storage {
   files {
-    ["/etc/NetworkManager/system-connections/eno1.nmconnection"] {
-      path = "/etc/NetworkManager/system-connections/eno1.nmconnection"
+    // ["/etc/NetworkManager/system-connections/eno1.nmconnection"] {
+    //   path = "/etc/NetworkManager/system-connections/eno1.nmconnection"
+    //   mode {
+    //     value = "0o600"
+    //   }
+    //   contents {
+    //     inline = read(path.drop(1)).text
+    //   }
+    // }
+    ["/opt/envoy/envoy-deployment.yaml"] {
+      path = "/opt/envoy/envoy-deployment.yaml"
+      mode {
+        value = "0o600"
+      }
+      contents {
+        inline = ((import("../../deployments/envoy/deployment.pkl")) { 
+          config_maps = (((import("envoy-yaml.pkl")) {
+            host_dns_bind_ip = "172.16.13.2"
+            host_dns_bind_port = 53
+            host_dns_target_ip = "10.255.255.1"
+            host_dns_target_port = 5301
+          }).resources)
+        }).output.text
+      }
+    }
+    ["/etc/containers/systemd/envoy.kube"] {
+      path = "/etc/containers/systemd/envoy.kube"
+      mode {
+        value = "0o600"
+      }
+      contents {
+        inline = read(path.drop(1)).text
+      }
+    }
+    ["/etc/containers/systemd/envoy-bridge.network"] {
+      path = "/etc/containers/systemd/envoy-bridge.network"
+      mode {
+        value = "0o600"
+      }
+      contents {
+        inline = read(path.drop(1)).text
+      }
+    }
+    ["/etc/containers/systemd/envoy-macvlan.network"] {
+      path = "/etc/containers/systemd/envoy-macvlan.network"
       mode {
         value = "0o600"
       }

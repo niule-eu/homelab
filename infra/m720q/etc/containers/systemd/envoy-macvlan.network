@@ -1,0 +1,8 @@
+[Network]
+Subnet=172.16.13.0/24
+Gateway=172.16.13.1
+Driver=macvlan
+DisableDNS=true
+InterfaceName=eno1
+IPAMDriver=host-local
+Options=mode=bridge

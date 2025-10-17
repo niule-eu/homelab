@@ -1,0 +1,7 @@
+[Network]
+Subnet=10.255.255.0/30
+Gateway=10.255.255.1
+Driver=bridge
+DisableDNS=true
+InterfaceName=envoy
+IPAMDriver=host-local

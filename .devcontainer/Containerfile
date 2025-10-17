@@ -92,6 +92,7 @@ RUN dnf update -y && dnf install -y --setopt=install_weak_deps=False \
     bash-completion \
     tar \
     bzip2 \
+    gzip \
     butane
 
 COPY --chown=root:root --chmod=0755 --from=golang /tmp/go /usr/local/go
@@ -131,7 +132,7 @@ USER $USERNAME
 
 ENV PATH="$PATH:/opt/java/openjdk/bin"
 
-COPY <<EOF /home/$USERNAME/.config/containers/podman-connections.json
+COPY --chown=$USERNAME:$USERNAME <<EOF /home/$USERNAME/.config/containers/podman-connections.json
     {
       "Connection": { 
         "Default": "host",
@@ -145,14 +146,10 @@ COPY <<EOF /home/$USERNAME/.config/containers/podman-connections.json
     }
 EOF
 
-COPY <<EOF /home/$USERNAME/.bashrc.d/podman-alias
+COPY <<podman-alias <<"gopath-bin" <<"dnscontrol-completion" /home/$USERNAME/.bashrc.d/
     alias podman='podman-remote'
-EOF
-
-COPY <<"EOF" /home/$USERNAME/.bashrc.d/gopath-bin
+podman-alias
     export PATH=$PATH:$GOPATH/bin
-EOF
-
-COPY <<"EOF" /home/$USERNAME/.bashrc.d/dnscontrol-completion
+gopath-bin
     eval "$(dnscontrol shell-completion bash)"
-EOF
+dnscontrol-completion

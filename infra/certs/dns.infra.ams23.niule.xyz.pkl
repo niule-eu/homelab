@@ -1,0 +1,10 @@
+amends "../../deployments/certs/job.pkl"
+
+lego_domains {
+  "dns.infra.ams23.niule.xyz"
+}
+lego_email = "niu@niule.xyz"
+lego_ovh_application_key = read("sops:/OVH_API_DNSCONTROL_KEY").text
+lego_ovh_application_secret = read("sops:/OVH_API_DNSCONTROL_SECRET").text
+lego_ovh_consumer_key = read("sops:/OVH_API_DNSCONTROL_CONSUMER_KEY").text
+lego_ovh_endpoint = "ovh-eu"

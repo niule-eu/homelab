@@ -1,0 +1,11 @@
+ovh {
+  TYPE = "OVH"
+  `app-key` = read("sops:/OVH_API_DNSCONTROL_KEY").text
+  `app-secret-key` = read("sops:/OVH_API_DNSCONTROL_SECRET").text
+  `consumer-key` = read("sops:/OVH_API_DNSCONTROL_CONSUMER_KEY").text
+  endpoint = "eu"
+}
+
+output {
+  renderer = new JsonRenderer {}
+}

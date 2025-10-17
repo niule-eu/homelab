@@ -104,7 +104,7 @@ resources: Listing<K8sResource> = (config_maps) {
               ports {
                 new {
                   containerPort = 8081
-                  hostIP = "127.0.0.1"
+                  hostIP = "10.255.255.1"
                   hostPort = 8081
                   protocol = "TCP"
                 }
@@ -140,13 +140,13 @@ resources: Listing<K8sResource> = (config_maps) {
               }
               ports {
                 new {
-                  hostIP = "127.0.0.1"
+                  hostIP = "10.255.255.1"
                   hostPort = 5301
                   containerPort = 5301
                   protocol = "TCP"
                 }
                 new {
-                  hostIP = "127.0.0.1"
+                  hostIP = "10.255.255.1"
                   hostPort = 5301
                   containerPort = 5301
                   protocol = "UDP"

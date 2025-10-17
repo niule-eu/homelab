@@ -1,129 +1,31 @@
 import "package://pkg.pkl-lang.org/pkl-k8s/k8s@1.2.1#/K8sResource.pkl"
 import "package://pkg.pkl-lang.org/pkl-k8s/k8s@1.2.1#/api/core/v1/ConfigMap.pkl"
 
-hidden host_dns_bind_ip : String = "172.16.13.2"
-hidden host_dns_bind_port : Int = 53
-hidden host_dns_target_ip : String = "127.0.0.1"
-hidden host_dns_target_port : Int = 5301
+hidden envoy_yaml : Any?
 
-class DnsListener {
-  hidden _protocol : String
-  hidden _ip : String
-  hidden _port : Int
+class EnvoyYaml {
+  hidden envoy_yaml : Any?
 
-  name = "dns_" + _protocol.toLowerCase()
-  address {
-    socket_address {
-      address = _ip
-      port_value = _port
-      protocol = _protocol
-    }
-  }
-  udp_listener_config : Any?
-  listener_filters : Listing<Any>
-  filter_chains : Listing<Any>
-}
-
-class DnsCluster {
-  hidden _protocol : String
-  hidden _ip : String
-  hidden _port : Int
-
-  name = "dns_fwd_" + _protocol.toLowerCase()
-  type = "STATIC"
-  load_assignment {
-    cluster_name = name
-    endpoints = new Listing {
-      new {
-        lb_endpoints = new Listing {
-          new {
-            endpoint {
-              address {
-                socket_address {
-                  address = _ip
-                  port_value = _port
-                  protocol = _protocol
-                }
-              }
-            }
-          }
+  resources : Listing<K8sResource> = new {
+    when (envoy_yaml != null) {
+      new ConfigMap {
+        metadata {
+          name = "envoy-config"
         }
-      }
+        data {
+          ["envoy.yaml"] = 
+            (new YamlRenderer {}).renderDocument(envoy_yaml)
+        }
+      } 
     }
   }
 }
 
-local envoy_yaml {
-  static_resources {
-    listeners = new Listing {
-      new DnsListener { 
-        _protocol = "TCP"
-        _ip = host_dns_bind_ip
-        _port = host_dns_bind_port
-        filter_chains = new Listing {
-          new {
-            filters = new Listing {
-              new {
-                name = "envoy.filters.network.tcp_proxy"
-                typed_config {
-                  `@type` = "type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy"
-                  stat_prefix = "tcp_proxy"
-                  cluster = "dns_fwd_tcp"
-                }
-              }
-            }
-          }
-        } 
-      }
-      new DnsListener { 
-        _protocol = "UDP"
-        _ip = host_dns_bind_ip
-        _port = host_dns_bind_port
-        udp_listener_config {
-          downstream_socket_config {
-            max_rx_datagram_size = 4096
-          }
-        }
-        listener_filters = new Listing {
-          new {
-            name = "envoy.filters.udp_listener.udp_proxy"
-            typed_config {
-              `@type` = "type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig"
-              stat_prefix = "udp_proxy"
-              upstream_socket_config {
-                max_rx_datagram_size = 4096
-              }
-              matcher {
-                on_no_match {
-                  action {
-                    name = "route"
-                    typed_config {
-                      `@type` = "type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route"
-                      cluster = "dns_fwd_udp"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-    clusters = new Listing {
-      new DnsCluster { _protocol = "TCP"; _ip = host_dns_target_ip; _port = host_dns_target_port }
-      new DnsCluster { _protocol = "UDP"; _ip= host_dns_target_ip; _port = host_dns_target_port }
-    }
-  }
-}
+resources: Listing<K8sResource> = (new EnvoyYaml { envoy_yaml = module.envoy_yaml }).resources
 
-resources: Listing<K8sResource> = new {
-  new ConfigMap {
-    metadata {
-      name = "envoy-config"
-    }
-    data {
-      ["envoy.yaml"] = 
-        (new YamlRenderer {}).renderDocument(envoy_yaml)
-    }
+output {
+  value = resources
+  renderer = (K8sResource.output.renderer as YamlRenderer) {
+    isStream = true
   }
 }

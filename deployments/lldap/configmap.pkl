@@ -9,11 +9,11 @@ resources: Listing<K8sResource> = new {
     }
     immutable = true
     data {
-      ["LLDAP_LDAP_USER_PASS"] = read("sops:/lldap_ldap_user_pass").text.base64
+      ["LLDAP_LDAP_USER_PASS"] = read("sops:/lldap_ldap_user_pass").text
       // jq -n --arg val "`LC_ALL=C tr -dc 'A-Za-z0-9!#%&'\''()*+,-./:;<=>?@[\]^_{|}~' </dev/urandom | head -c 32`" '$val' | xargs -I {} sops set secrets.yaml '["lldap_jwt_secret"]' '"{}"'
-      ["LLDAP_JWT_SECRET"] = read("sops:/lldap_jwt_secret").text.base64
+      ["LLDAP_JWT_SECRET"] = read("sops:/lldap_jwt_secret").text
       // jq -n --arg val "`LC_ALL=C tr -dc 'A-Za-z0-9!#%&'\''()*+,-./:;<=>?@[\]^_{|}~' </dev/urandom | head -c 32`" '$val' | xargs -I {} sops set secrets.yaml '["lldap_key_seed"]' '"{}"'
-      ["LLDAP_KEY_SEED"] = read("sops:/lldap_key_seed").text.base64
+      ["LLDAP_KEY_SEED"] = read("sops:/lldap_key_seed").text
     }
   }
   

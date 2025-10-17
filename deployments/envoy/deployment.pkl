@@ -6,7 +6,8 @@ hidden config_maps =
   let (envoy_config = (envoyconfig.resources.toList()))
     (envoy_config).toListing()
 
-resources: Listing<K8sResource> = (config_maps) {
+resources: Listing<K8sResource> = new {
+  ...config_maps
   new Deployment {
     metadata {
       name = "envoy"
@@ -28,10 +29,9 @@ resources: Listing<K8sResource> = (config_maps) {
           }
         }
         spec {
-          hostNetwork = true
           containers {
             new {
-              name = "proxy"
+              name = "envoy"
               image = "docker.io/envoyproxy/envoy:distroless-v1.35-latest"
               securityContext {
                 capabilities {
@@ -46,6 +46,7 @@ resources: Listing<K8sResource> = (config_maps) {
                   mountPath = "/etc/envoy/envoy.yaml:Z"
                   name = "envoy-config"
                   subPath = "envoy.yaml"
+                  readOnly = true
                 }
               }
             }

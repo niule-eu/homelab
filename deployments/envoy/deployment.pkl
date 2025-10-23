@@ -1,13 +1,14 @@
 import "package://pkg.pkl-lang.org/pkl-k8s/k8s@1.2.1#/K8sResource.pkl"
 import "package://pkg.pkl-lang.org/pkl-k8s/k8s@1.2.1#/api/apps/v1/Deployment.pkl"
-import "configmaps/envoy-config.pkl" as envoyconfig
+import "configmaps/envoy-configs.pkl" as envoyconfigs
+import "configmaps/envoy-secrets.pkl" as envoysecrets
 
-hidden config_maps =
-  let (envoy_config = (envoyconfig.resources.toList()))
-    (envoy_config).toListing()
+hidden envoy_configs = envoyconfigs.resources
+hidden envoy_secrets = envoysecrets.resources
 
 resources: Listing<K8sResource> = new {
-  ...config_maps
+  ...envoy_configs
+  ...envoy_secrets
   new Deployment {
     metadata {
       name = "envoy"
@@ -44,8 +45,13 @@ resources: Listing<K8sResource> = new {
               volumeMounts {
                 new {
                   mountPath = "/etc/envoy/envoy.yaml:Z"
-                  name = "envoy-config"
+                  name = "envoy-configs"
                   subPath = "envoy.yaml"
+                  readOnly = true
+                }
+                new {
+                  mountPath = "/etc/envoy/secrets/:Z"
+                  name = "envoy-secrets"
                   readOnly = true
                 }
               }
@@ -53,9 +59,15 @@ resources: Listing<K8sResource> = new {
           }
           volumes {
             new {
-              name = "envoy-config"
+              name = "envoy-configs"
               configMap {
-                name = "envoy-config"
+                name = "envoy-configs"
+              }
+            }
+            new {
+              name = "envoy-secrets"
+              secret {
+                secretName = "envoy-secrets"
               }
             }
           }

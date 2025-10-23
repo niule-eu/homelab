@@ -1,0 +1,30 @@
+import "package://pkg.pkl-lang.org/pkl-k8s/k8s@1.2.1#/K8sResource.pkl"
+import "package://pkg.pkl-lang.org/pkl-k8s/k8s@1.2.1#/api/core/v1/ConfigMap.pkl"
+
+hidden envoy_configs : Mapping<String, String>?
+
+class EnvoyYaml {
+  hidden envoy_configs : Mapping<String, String>
+
+  resources : Listing<K8sResource> = new {
+    new ConfigMap {
+      metadata {
+        name = "envoy-configs"
+      }
+      data {
+        ...envoy_configs
+        // ["envoy.yaml"] = 
+        //   (new YamlRenderer {}).renderDocument(envoy_configs)
+      }
+    }
+  }
+}
+
+resources: Listing<K8sResource> = (new EnvoyYaml { envoy_configs = module.envoy_configs ?? new Mapping {} }).resources
+
+output {
+  value = resources
+  renderer = (K8sResource.output.renderer as YamlRenderer) {
+    isStream = true
+  }
+}

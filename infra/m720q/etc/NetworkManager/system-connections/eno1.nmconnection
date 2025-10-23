@@ -2,6 +2,7 @@
 id=eno1
 type=ethernet
 interface-name=eno1
+[ethernet]
+accept-all-mac-addresses=1
 [ipv4]
-address1=172.16.13.2/24
-method=manual
+method=auto

@@ -1,0 +1,17 @@
+FROM curlimages/curl:latest as doh-proxy
+
+ARG DNSCRYPT_DOH_SERVER_TAG=0.9.15
+ARG DNSCRYPT_DOH_SERVER_URL=https://api.github.com/repos/DNSCrypt/doh-server/releases/assets/300090753
+
+RUN <<EOF /bin/sh
+    set -eux
+    curl -H "Accept: application/octet-stream" -Lo doh-server.tar.bz2 ${DNSCRYPT_DOH_SERVER_URL}
+    tar -C /tmp/ -xjf doh-server.tar.bz2 --strip-components 1
+    rm -rf doh-server.tar.gz
+EOF
+
+FROM gcr.io/distroless/static-debian12:nonroot
+
+COPY --chown=root:root --chmod=0755 --from=doh-proxy /tmp/doh-proxy /usr/local/doh-proxy
+
+ENTRYPOINT ["/usr/local/doh-proxy"]

@@ -6,6 +6,13 @@ ovh {
   endpoint = "eu"
 }
 
+powerdns {
+  TYPE = "POWERDNS"
+  apiKey = "password"
+  apiUrl = "https://pdnsapi.infra.ams23.niule.xyz"
+  serverName = "localhost"
+}
+
 output {
   renderer = new JsonRenderer {}
 }

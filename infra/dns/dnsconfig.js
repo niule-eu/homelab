@@ -1,6 +1,7 @@
-var REG_OVH = NewRegistrar("ovh");
 var REG_NONE = NewRegistrar("none");
+var REG_OVH = NewRegistrar("ovh");
 var DSP_OVH = NewDnsProvider("ovh");
+var DSP_PDNS = NewDnsProvider("powerdns")
 
 // D("niule.xyz", REG_OVH, DnsProvider(DSP_OVH),
 //     DefaultTTL(3600),
@@ -26,4 +27,11 @@ D("ams23.niule.xyz", REG_NONE, DnsProvider(DSP_OVH),
     NAMESERVER_TTL(3600),
     A("@", "213.186.33.5"),
     A("www", "213.186.33.5"),
+)
+
+D("infra.ams23.niule.xyz", REG_NONE, DnsProvider(DSP_PDNS), {no_ns: 'true'},
+    SOA("@", "ns.infra.ams23.niule.xyz.", "hostmaster.infra.ams23.niule.xyz.", 3600, 600, 604800, 1440),
+    A("dns", "172.16.13.2"),
+    A("pdnsapi", "172.16.13.2"),
+    A("bpir4", "172.16.13.1"),
 )

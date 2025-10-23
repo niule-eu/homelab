@@ -123,9 +123,10 @@ resources: Listing<K8sResource> = (config_maps) {
                   name = "pdns-sqlite3"
                 }
                 new {
-                  mountPath = "/etc/powerdns/pdns.d/local-port.conf:Z"
+                  mountPath = "/etc/powerdns/pdns.d/pdns.conf:Z"
                   name = "pdns-config"
-                  subPath = "local-port.conf"
+                  subPath = "pdns.conf"
+                  readOnly = true
                 }
               }
             }

@@ -24,7 +24,9 @@
         "--hostname", "${localWorkspaceFolderBasename}-dc",
         "--security-opt", "label:type:container_runtime_t",
         "--env", "GOPATH=/home/${localEnv:USER}/go",
-        "--env", "LOCAL_WORKSPACE_FOLDER=${localWorkspaceFolder}"
+        "--env", "LOCAL_WORKSPACE_FOLDER=${localWorkspaceFolder}",
+        "--add-host", "pdnsapi.infra.ams23.niule.xyz:172.16.13.2",
+        "--add-host", "dns.infra.ams23.niule.xyz:172.16.13.2"
     ],
     "containerUser": "${localEnv:USER}",
     "remoteUser": "${localEnv:USER}",

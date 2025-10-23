@@ -1,34 +1,53 @@
-import "../../deployments/envoy/configmaps/envoy-config.pkl" as envoyconfig
-
 hidden host_dns_bind_ip : String = "172.16.13.2"
 hidden host_dns_bind_port : Int = 53
 hidden host_dns_target_ip : String = "127.0.0.1"
 hidden host_dns_target_port : Int = 5301
+hidden host_pdns_api_bind_ip : String
+hidden host_pdns_apt_bind_port : Int
+hidden host_pdns_api_target_ip : String
+hidden host_pdns_apt_target_port : Int
 
-class DnsListener {
-  hidden _protocol : String
-  hidden _ip : String
-  hidden _port : Int
+hidden dot_certificate_chain_path : String?
+hidden dot_private_key_path : String?
+hidden pdnsapi_certificate_chain_path : String?
+hidden pdnsapi_private_key_path : String?
+hidden host_dot_bind_port : Int?
 
-  name = "dns_" + _protocol.toLowerCase()
-  address {
+abstract class Address {
+  function address() : Any = throw("Abstract method")
+}
+
+class SocketAddress extends Address {
+  hidden ip : String
+  hidden port : Int
+  hidden protocol : "TCP" | "UDP" = "TCP"
+
+  local proto = protocol
+  local address {
     socket_address {
-      address = _ip
-      port_value = _port
-      protocol = _protocol
+      address = ip
+      port_value = port
+      protocol = proto
     }
   }
+
+  function address() : Any = address
+}
+
+class DnsListener {
+  hidden listener_address : Address
+  
+  name : String
+  address = listener_address.address()
   udp_listener_config : Any?
   listener_filters : Listing<Any>
   filter_chains : Listing<Any>
 }
 
-class DnsCluster {
-  hidden _protocol : String
-  hidden _ip : String
-  hidden _port : Int
-
-  name = "dns_fwd_" + _protocol.toLowerCase()
+class SimpleCluster {
+  hidden endpoint_address : Address
+  
+  name : String
   type = "STATIC"
   load_assignment {
     cluster_name = name
@@ -36,15 +55,7 @@ class DnsCluster {
       new {
         lb_endpoints = new Listing {
           new {
-            endpoint {
-              address {
-                socket_address {
-                  address = _ip
-                  port_value = _port
-                  protocol = _protocol
-                }
-              }
-            }
+            endpoint { address = endpoint_address.address() }
           }
         }
       }
@@ -52,72 +63,264 @@ class DnsCluster {
   }
 }
 
-hidden envoy_yaml {
-  static_resources {
-    listeners = new Listing {
-      new DnsListener { 
-        _protocol = "TCP"
-        _ip = host_dns_bind_ip
-        _port = host_dns_bind_port
-        filter_chains = new Listing {
+
+class SimpleHttpsFilterChain {
+  hidden cluster_domains_mappings : Mapping<String, Listing<String>>
+  hidden vhosts : Listing<Any> = new Listing {}
+  hidden certificate_chain_file_path : String
+  hidden certificate_private_key_file_path : String
+  
+  local _server_names = cluster_domains_mappings.toMap().values.flatten().toListing()
+
+  local _vhosts = 
+    cluster_domains_mappings
+      .fold(vhosts, (acc : Listing<Any>, k, v) -> (
+        new Listing {
+          ...acc
           new {
-            filters = new Listing {
+            name = k + "_vhost"
+            domains = v
+            routes = new Listing {
               new {
-                name = "envoy.filters.network.tcp_proxy"
-                typed_config {
-                  `@type` = "type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy"
-                  stat_prefix = "tcp_proxy"
-                  cluster = "dns_fwd_tcp"
-                }
+                match { prefix = "/"}
+                route { cluster = k }
               }
             }
           }
-        } 
-      }
-      new DnsListener { 
-        _protocol = "UDP"
-        _ip = host_dns_bind_ip
-        _port = host_dns_bind_port
-        udp_listener_config {
-          downstream_socket_config {
-            max_rx_datagram_size = 4096
+        }
+      ))
+
+  name : String
+  filter_chain_match {
+    server_names = _server_names
+  }
+  filters = new Listing {
+    new {
+      name = "envoy.filters.network.http_connection_manager"
+      typed_config {
+        `@type` = "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"
+        stat_prefix = "ingress_https"
+        route_config {
+          virtual_hosts = _vhosts
+        }
+        http_filters = new Listing {
+          new {
+            name = "http_router"
+            typed_config {
+              `@type` = "type.googleapis.com/envoy.extensions.filters.http.router.v3.Router"
+            }
           }
         }
-        listener_filters = new Listing {
+      }
+    }
+  }
+  transport_socket {
+    name= "envoy.transport_sockets.tls"
+    typed_config {
+      `@type`= "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext"
+      common_tls_context {
+        tls_certificates = new Listing {
           new {
-            name = "envoy.filters.udp_listener.udp_proxy"
-            typed_config {
-              `@type` = "type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig"
-              stat_prefix = "udp_proxy"
-              upstream_socket_config {
-                max_rx_datagram_size = 4096
+            certificate_chain { filename = certificate_chain_file_path }
+            private_key { filename = certificate_private_key_file_path }
+          }
+        }
+        validation_context {
+          trusted_ca { filename = "/etc/ssl/certs/ca-certificates.crt"}
+        }
+      }
+    }
+  }
+}
+
+class SimpleHttpsListener {
+  hidden listener_address : Address
+  hidden simple_filter_chains : Listing<SimpleHttpsFilterChain>
+  
+  name : String 
+  address = listener_address.address()
+  filter_chains = simple_filter_chains
+  listener_filters = new Listing {
+    new {
+      name = "tls_inspector"
+      typed_config {
+        `@type` = "type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector"
+      }
+    }
+  }
+}
+
+local _clusters = new Mapping<String, Any> {
+  ["dns_tcp_cluster"] = new SimpleCluster {
+    name = "dns_fwd_tcp"
+    endpoint_address = new SocketAddress {
+      ip = host_dns_target_ip
+      port = host_dns_target_port
+    }
+  }
+  ["dns_udp_cluster"] = new SimpleCluster {
+    name = "dns_fwd_udp"
+    endpoint_address = new SocketAddress {
+      protocol = "UDP"
+      ip = host_dns_target_ip
+      port = host_dns_target_port
+    }
+  }
+  ["powerdns_api_cluster"] = new SimpleCluster {
+    name = "pdns_api"
+    endpoint_address = new SocketAddress {
+      ip = host_pdns_api_target_ip
+      port = host_pdns_apt_target_port
+    }
+  }
+}
+
+local _listeners = new Mapping<String, Any> {
+  when (dot_certificate_chain_path != null && dot_private_key_path != null && host_dot_bind_port != null) {
+    ["dns_dot_listener"] = new DnsListener {
+      name = "dns_dot_listener"
+      listener_address = new SocketAddress {
+        ip = host_dns_bind_ip
+        protocol = "TCP"
+        port = host_dot_bind_port
+      }
+      filter_chains = new Listing {
+        new {
+          filters = new Listing {
+            new {
+              name = "envoy.filters.network.tcp_proxy"
+              typed_config {
+                `@type` = "type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy"
+                stat_prefix = "tcp_proxy"
+                cluster = (_clusters["dns_tcp_cluster"] as SimpleCluster).name
               }
-              matcher {
-                on_no_match {
-                  action {
-                    name = "route"
-                    typed_config {
-                      `@type` = "type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route"
-                      cluster = "dns_fwd_udp"
-                    }
+            }
+          }
+          transport_socket {
+            name= "envoy.transport_sockets.tls"
+            typed_config {
+              `@type`= "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext"
+              common_tls_context {
+                tls_certificates = new Listing {
+                  new {
+                    certificate_chain { filename = dot_certificate_chain_path!! }
+                    private_key { filename = dot_private_key_path!! }
                   }
                 }
+                validation_context {
+                  trusted_ca { filename = "/etc/ssl/certs/ca-certificates.crt"}
+                }
+              }
+            }
+          }
+        }
+      } 
+    }
+  }
+  ["dns_tcp_listener"] = new DnsListener {
+    name = "dns_tcp_listener"
+    listener_address = new SocketAddress {
+      ip = host_dns_bind_ip
+      protocol = "TCP"
+      port = host_dns_bind_port
+      
+    }
+    filter_chains = new Listing {
+      new {
+        filters = new Listing {
+          new {
+            name = "envoy.filters.network.tcp_proxy"
+            typed_config {
+              `@type` = "type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy"
+              stat_prefix = "tcp_proxy"
+              cluster = (_clusters["dns_tcp_cluster"] as SimpleCluster).name
+            }
+          }
+        }
+      }
+    } 
+  }
+  ["dns_udp_listener"] = new DnsListener {
+    name = "dns_udp_listener"
+    listener_address = new SocketAddress {
+      protocol = "UDP"
+      ip = host_dns_bind_ip
+      port = host_dns_bind_port
+    }
+    udp_listener_config {
+      downstream_socket_config {
+        max_rx_datagram_size = 4096
+      }
+    }
+    listener_filters = new Listing {
+      new {
+        name = "envoy.filters.udp_listener.udp_proxy"
+        typed_config {
+          `@type` = "type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig"
+          stat_prefix = "udp_proxy"
+          upstream_socket_config {
+            max_rx_datagram_size = 4096
+          }
+          matcher {
+            on_no_match {
+              action {
+                name = "route"
+                typed_config {
+                  `@type` = "type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route"
+                  cluster = (_clusters["dns_udp_cluster"] as SimpleCluster).name
+                }
               }
             }
           }
         }
       }
     }
-    clusters = new Listing {
-      new DnsCluster { _protocol = "TCP"; _ip = host_dns_target_ip; _port = host_dns_target_port }
-      new DnsCluster { _protocol = "UDP"; _ip= host_dns_target_ip; _port = host_dns_target_port }
+  } 
+  ["https_listener"] = new SimpleHttpsListener {
+    name = "https_listener"
+    listener_address = new SocketAddress {
+      ip = host_pdns_api_bind_ip
+      port = host_pdns_apt_bind_port
+    }
+    simple_filter_chains {
+      new {
+        name = "pdns_api"
+        certificate_chain_file_path = pdnsapi_certificate_chain_path!!
+        certificate_private_key_file_path = pdnsapi_private_key_path!!
+        cluster_domains_mappings {
+          [(_clusters["powerdns_api_cluster"] as SimpleCluster).name] { 
+            "pdnsapi.infra.ams23.niule.xyz" 
+          }
+        }
+      }
+      new {
+        name = "dns_over_https"
+        certificate_chain_file_path = dot_certificate_chain_path!!
+        certificate_private_key_file_path = dot_private_key_path!!
+        cluster_domains_mappings {
+          [(_clusters["dns_tcp_cluster"] as SimpleCluster).name] {
+            "dns.infra.ams23.niule.xyz"
+          }
+        }
+      }
     }
   }
 }
 
-resources = (new envoyconfig.EnvoyYaml { envoy_yaml = module.envoy_yaml }).resources
+static_resources {
+  listeners = new Listing {
+    _listeners["dns_dot_listener"]
+    _listeners["dns_tcp_listener"]
+    _listeners["dns_udp_listener"]
+    _listeners["https_listener"]
+  }
+  clusters = new Listing {
+    _clusters["dns_tcp_cluster"]
+    _clusters["dns_udp_cluster"]
+    _clusters["powerdns_api_cluster"]
+  }
+}
 
 output {
-  value = resources
-  renderer = envoyconfig.output.renderer
+  renderer = new YamlRenderer {}
 }

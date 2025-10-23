@@ -9,8 +9,11 @@ resources: Listing<K8sResource> = new {
       name = "pdns-config"
     }
     data {
-      ["local-port.conf"] = """
+      ["pdns.conf"] = """
         local-port=\(pdns_auth_port)
+        log-dns-queries=yes
+        log-dns-details=yes
+        loglevel=6
         """
     }
   }

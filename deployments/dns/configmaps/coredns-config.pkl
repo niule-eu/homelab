@@ -4,7 +4,7 @@ import "package://pkg.pkl-lang.org/pkl-k8s/k8s@1.2.1#/api/core/v1/ConfigMap.pkl"
 hidden zones_yaml_doc {
   zones = new Listing {
     new {
-      name = "infra.lan.niule.xyz"
+      name = "infra.ams23.niule.xyz"
       cache_ttl_seconds = 60
       target_port = 5300
     }

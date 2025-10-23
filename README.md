@@ -8,8 +8,14 @@ hlcli render-pkl -m infra/m720q/m720q.pkl | butane | ssh ignition@192.168.3.1 'c
 
 ### Install to disk
 
-```bash
-sudo coreos-installer install /dev/sda --ignition-url http://172.16.13.1:9714/m720q.ign --ignition-hash sha256-ffd5bef238cc26dd43e15b647f1f7bd9c54265bfe2918b6631a34b4bc019ea5e
+``` bash
+# get sha with
+SHA=`hlcli render-pkl -m infra/m720q/m720q.pkl | butane | sha256sum | sd '(.*)\s+-\s' 'sha256-$1'`
+```
+
+``` bash
+# execute on fedora coreos live instance
+sudo coreos-installer install /dev/sda --ignition-url http://172.16.13.1:9714/m720q.ign --ignition-hash $SHA
 ```
 
 ## Radxa X4
@@ -73,4 +79,15 @@ hlcli render-pkl -m infra/dns/creds.pkl | dnscontrol push --config infra/dns/dns
 
 ``` bash
 hlcli render-pkl -m infra/certs/dns.infra.ams23.niule.xyz.pkl | podman kube play --replace -
+```
+
+### DNS over TLS on Windows 11
+
+How to manually set DNS in Windows 11:
+* https://www.elevenforum.com/t/enable-dns-over-tls-dot-in-windows-11.9012/
+
+How to configure DoT with netsh
+``` cmd
+netsh dns add global dot=yes
+netsh dns add encryption server=172.16.13.2 dothost="dns.infra.ams23.niule.xyz" autoupgrade=yes
 ```

@@ -18,3 +18,9 @@
   owner: stackexchange
   pattern: 'linux_amd64.tar.gz$'
   checksums_pattern: 'checksums.txt'
+- repo: sd
+  owner: chmln
+  pattern: 'x86_64-unknown-linux-gnu.tar.gz$'
+- repo: doh-server
+  owner: dnscrypt
+  pattern: 'linux-x86_64.tar.bz2$'

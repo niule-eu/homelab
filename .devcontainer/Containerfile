@@ -81,6 +81,18 @@ RUN <<EOF /bin/sh
     rm -rf dnscontrol.tar.gz
 EOF
 
+# Download sd and move to /tmp
+FROM curlimages/curl:latest as sd
+
+ARG CHMLN_SD_URL
+
+RUN <<EOF /bin/sh
+    set -eux
+    curl -H "Accept: application/octet-stream" -Lo sd.tar.gz ${CHMLN_SD_URL}
+    tar -C /tmp/ -xzf sd.tar.gz --strip-components 1
+    rm -rf sd.tar.gz
+EOF
+
 FROM fedora-minimal:42
 
 ARG USERID
@@ -93,7 +105,8 @@ RUN dnf update -y && dnf install -y --setopt=install_weak_deps=False \
     tar \
     bzip2 \
     gzip \
-    butane
+    butane \
+    yq jq
 
 COPY --chown=root:root --chmod=0755 --from=golang /tmp/go /usr/local/go
 COPY --chown=root:root --chmod=0755 --from=sops /tmp/sops /usr/local/bin/
@@ -102,6 +115,8 @@ COPY --chown=root:root --chmod=0755 --from=podman-remote /tmp/bin/podman* /usr/l
 COPY --chown=root:root --chmod=0755 --from=pkl /tmp/pkl /usr/local/bin/
 COPY --chown=root:root --chmod=0755 --from=java  /opt/java /opt/java
 COPY --chown=root:root --chmod=0755 --from=dnscontrol /tmp/dnscontrol /usr/local/bin/
+COPY --chown=root:root --chmod=0755 --from=sd /tmp/sd /usr/local/bin/
+COPY --chown=root:root --chmod=0644 --from=sd /tmp/completions/sd.bash /usr/share/bash-completion/completions/sd
 
 # create container user
 RUN <<EOF /bin/bash
@@ -146,10 +161,11 @@ COPY --chown=$USERNAME:$USERNAME <<EOF /home/$USERNAME/.config/containers/podman
     }
 EOF
 
-COPY <<podman-alias <<"gopath-bin" <<"dnscontrol-completion" /home/$USERNAME/.bashrc.d/
+COPY --chown=$USERNAME:$USERNAME <<podman-alias <<"gopath-bin" <<"dnscontrol-completion" /home/$USERNAME/.bashrc.d/
     alias podman='podman-remote'
 podman-alias
     export PATH=$PATH:$GOPATH/bin
 gopath-bin
     eval "$(dnscontrol shell-completion bash)"
 dnscontrol-completion
+

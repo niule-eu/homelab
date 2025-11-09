@@ -1,0 +1,35 @@
+import "@k8s/K8sResource.pkl"
+import "@k8s/api/core/v1/ConfigMap.pkl"
+import "@net/net.pkl"
+
+hidden ddns_domans : Listing<DdnsDomain> = new {}
+
+class DdnsDomain {
+  hidden domain_suffix : String
+  hidden dns_servers : Mapping<net.IPv4Address, Int>
+  
+  fixed name = domain_suffix
+  fixed `dns-servers` = 
+    dns_servers
+      .fold(
+        new Listing {}, 
+        (result : Listing, ip : net.IPv4Address, _port : Int) -> 
+          (result) { new { `ip-address` = ip.toString(); port = _port } }
+      )
+}
+
+function GomplPodIPLookup() = """{{ net.LookupIP (env.Getenv "POD_NAME") }}"""
+
+local dhcpddns_json {
+  DhcpDdns {
+    `ip-address` = GomplPodIPLookup()
+    port = 53001
+    `forward-ddns` {
+        `ddns-domains` = ddns_domans
+    }
+  }
+}
+
+resources : Listing<ConfigMap> = new {
+
+}

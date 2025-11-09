@@ -46,7 +46,9 @@ resources: Listing<K8sResource> = new {
         . {
           cache 60
           log
-          forward . 1.1.1.2 1.0.0.2
+          forward . tls://1.1.1.2 tls://1.0.0.2 {
+            tls_servername security.cloudflare-dns.com
+          }
         }
         """
     }

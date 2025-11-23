@@ -5,6 +5,8 @@ import "configmaps/envoy-secrets.pkl" as envoysecrets
 
 hidden envoy_configs = envoyconfigs.resources
 hidden envoy_secrets = envoysecrets.resources
+hidden envoy_container_image : String = "docker.io/envoyproxy/envoy"
+hidden envoy_container_image_tag : String = "distroless-v1.36-latest"
 
 resources: Listing<K8sResource> = new {
   ...envoy_configs
@@ -33,7 +35,7 @@ resources: Listing<K8sResource> = new {
           containers {
             new {
               name = "envoy"
-              image = "docker.io/envoyproxy/envoy:distroless-v1.35-latest"
+              image = "\(envoy_container_image):\(envoy_container_image_tag)"
               securityContext {
                 capabilities {
                   add {

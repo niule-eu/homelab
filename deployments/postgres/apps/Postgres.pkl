@@ -1,0 +1,127 @@
+extends "../template.pkl"
+
+import "@net/net.pkl"
+
+class Inputs {
+  init_script_content: String?
+  extra_env: Mapping<String, String>
+  extra_secrets: Mapping<String, String>
+  container_image: String = "docker.io/postgres:alpine"
+  container_port: Int = 5432
+  host_port: Int?
+  host_ip: String?
+}
+
+hidden inputs: Inputs
+
+configMaps {
+  ["pg-env"] {
+    data = (
+      new Mapping<String, String> {
+        ["PGDATA"] = "/data/pgdata"
+        ["POSTGRES_DB"] = "postgres"
+        ["POSTGRES_USER"] = "postgres"
+      }
+    ) { ...inputs.extra_env }
+  }
+  when (inputs.init_script_content != null) {
+    ["pg-init-script"] {
+      data {
+        ["init-script.sh"] = inputs.init_script_content!!
+      }
+    }
+  }
+}
+
+secrets {
+  ["pg-secrets"] {
+    data = (
+      new Mapping<String, String> {
+        ["POSTGRES_PASSWORD"] = "postgres"
+      }
+    ) { ...inputs.extra_secrets }
+  }
+}
+
+volumes {
+  ["pg-data"] {
+    persistentVolumeClaim {
+      claimName = "pg-data"
+    }
+  }
+  when (inputs.init_script_content != null) {
+    ["pg-init-script"] {
+      configMap {
+        name = "pg-init-script"
+      }
+    }
+  }
+}
+
+initContainers {
+  when (inputs.init_script_content != null) {
+    ["pg-init"] {
+      image = inputs.container_image
+      command {
+        "/usr/local/bin/docker-ensure-initdb.sh"
+      }
+      envFrom {
+        new {
+          configMapRef {
+            name = "pg-env"
+          }
+        }
+        new {
+          secretRef {
+            name = "pg-secrets"
+          }
+        }
+      }
+      volumeMounts {
+        new {
+          mountPath = "/data:Z"
+          name = "pg-data"
+        }
+        new {
+          mountPath = "/docker-entrypoint-initdb.d/init-script.sh:Z"
+          name = "pg-init-script"
+          subPath = "init-script.sh"
+        }
+      }
+    }
+  }
+}
+
+containers {
+  ["postgres"] {
+    image = inputs.container_image
+    ports {
+      when (inputs.host_ip != null && inputs.host_port != null) {
+        new {
+          hostIP = inputs.host_ip!!
+          hostPort = inputs.host_port!!
+          containerPort = inputs.container_port!!
+          protocol = "TCP"
+        }
+      }
+    }
+    envFrom {
+      new {
+        configMapRef {
+          name = "pg-env"
+        }
+      }
+      new {
+        secretRef {
+          name = "pg-secrets"
+        }
+      }
+    }
+    volumeMounts {
+      new {
+        mountPath = "/data:Z"
+        name = "pg-data"
+      }
+    }
+  }
+}

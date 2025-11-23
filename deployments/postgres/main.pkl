@@ -1,0 +1,59 @@
+extends "template.pkl"
+
+import "apps/Postgres.pkl"
+
+podName: String = "postgres"
+
+class PostgresInputs {
+  postgres: Postgres.Inputs
+}
+
+hidden inputs: PostgresInputs = new {
+  postgres {
+    init_script_content =
+      """
+      #/bin/ash
+      set -eux
+      psql -v ON_ERROR_STOP=1 --username $POSTGRES_USER --dbname $POSTGRES_DB <<- EOSQL
+        CREATE ROLE $KEA_DB_USERNAME LOGIN PASSWORD '$KEA_DB_PASSWORD';
+        CREATE DATABASE $KEA_DB_DATABASE WITH OWNER = $KEA_DB_USERNAME ENCODING = 'UTF8';
+        GRANT ALL PRIVILEGES ON DATABASE $KEA_DB_DATABASE TO $KEA_DB_USERNAME
+      EOSQL
+      """
+    extra_env = new Mapping {
+      ["POSTGRES_USER"] = "postgres"
+      ["POSTGRES_DB"] = "postgres"
+      ["KEA_DB_USERNAME"] = "kea"
+      ["KEA_DB_DATABASE"] = "kea"
+    }
+    extra_secrets = new Mapping {
+      ["KEA_DB_PASSWORD"] = "kea"
+      ["POSTGRES_PASSWORD"] = "postgres"
+    }
+  }
+}
+
+local postgres = (Postgres) {
+  podName = module.podName
+  inputs = module.inputs.postgres
+}
+
+configMaps {
+  ...postgres.configMaps
+}
+
+secrets {
+  ...postgres.secrets
+}
+
+volumes {
+  ...postgres.volumes
+}
+
+initContainers {
+  ...postgres.initContainers
+}
+
+containers {
+  ...postgres.containers
+}

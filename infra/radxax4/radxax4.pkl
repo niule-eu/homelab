@@ -1,0 +1,285 @@
+amends "../default/default.pkl"
+
+import "pkl:reflect"
+
+import "@dhcp/main.pkl" as dhcp_manifest
+import "@dns/main.pkl" as dns_manifest
+import "@net/net.pkl"
+import "@postgres/main.pkl" as postgres_manifest
+
+import "./envoy-yaml.pkl" as envoyyaml
+
+local module_path: String = reflect.Module(module).uri.drop(7)
+local module_dir: String = (module_path.dropLastWhile((c: String) -> c != "/"))
+
+hostname = "radxax4"
+disable_stub_listener = true
+nm_no_auto_default = new {}
+enable_linger = true
+
+storage {
+  files {
+    ...(import("etc/NetworkManager/system-connections/nmconnections.pkl")).files
+    ["/opt/dns/dns-deployment.yaml"] {
+      path = "/opt/dns/dns-deployment.yaml"
+      mode {
+        value = "0o600"
+      }
+      contents {
+        inline =
+          (
+            (dns_manifest) {
+              podName = "dns"
+              inputs = new dns_manifest.DnsInputs {
+                coredns {
+                  upstream_dot {
+                    ips {
+                      "1.0.0.1"
+                      "1.0.0.2"
+                    }
+                    tls_servername = "security.cloudflare-dns.com"
+                  }
+                  zones {
+                    default {
+                      cache_ttl_seconds = 60
+                      target_port = 5300
+                    }
+                    new {
+                      name = "infra.ams23.niule.xyz"
+                    }
+                  }
+                  container_port = 5301
+                  host_port = 5301
+                  host_ip = "10.255.255.1"
+                }
+                ddns {
+                  container_port = 53001
+                  host_port = 53001
+                  host_ip = "10.255.255.1"
+                  domains {
+                    new {
+                      domain_suffix = "infra.ams23.niule.xyz"
+                      dns_servers {
+                        new {
+                          ip = "172.16.13.2"
+                          port = 5300
+                        }
+                      }
+                    }
+                  }
+                }
+                pdns {
+                  api_host_ip = "10.255.255.1"
+                  api_key = read("sops:/PDNS_API_KEY").text
+                  allow_dnsupdate_from = "10.255.255.0/29"
+                }
+              }
+            }
+          )
+            .output
+            .text
+      }
+    }
+    ["/opt/kea/kea-deployment.yaml"] {
+      path = "/opt/kea/kea-deployment.yaml"
+      mode {
+        value = "0o600"
+      }
+      contents {
+        inline =
+          (
+            (dhcp_manifest) {
+              podName = "kea"
+              inputs = new dhcp_manifest.DhcpInputs {
+                kea {
+                  dhcp4_interfaces {
+                    "VLAN13"
+                  }
+                  dhcp4_dns_servers {
+                    "172.16.13.2"
+                  }
+                  dhcp4_ddns_ip = "10.255.255.1"
+                  dhcp4_ddns_port = 53001
+                  postgres_database = "kea"
+                  postgres_user = "kea"
+                  postgres_password = read("sops:/KEA_DB_PASSWORD").text
+                  postgres_host = "10.255.255.9"
+                  subnets {
+                    new {
+                      id = 13
+                      `ddns-qualifying-suffix` = "infra.ams23.niule.xyz"
+                      interface = "VLAN13"
+                      subnet = "172.16.13.0/24"
+                      reservations {
+                        new {
+                          `hw-address` = "44:b7:d0:e3:24:50"
+                          `ip-address` = "172.16.13.51"
+                          hostname = "jetkvm-dc"
+                        }
+                        new {
+                          `hw-address` = "44:b7:d0:e6:59:48"
+                          `ip-address` = "172.16.13.52"
+                          hostname = "jetkvm-atx"
+                        }
+                        new {
+                          `hw-address` = "10:02:b5:86:1a:1f"
+                          `ip-address` = "172.16.13.14"
+                          hostname = "radxax4"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          )
+            .output
+            .text
+      }
+    }
+    ["/opt/kea/\(dhcp_manifest.containers["kea-dhcp4"].image)/Containerfile"] {
+      path = "/opt/kea/\(dhcp_manifest.containers["kea-dhcp4"].image)/Containerfile"
+      mode {
+        value = "0o600"
+      }
+      contents {
+        inline = dhcp_manifest.configMaps["kea-containerfile"].data!!["Containerfile"]
+      }
+    }
+    ["/opt/kea/postgres-deployment.yaml"] {
+      path = "/opt/kea/postgres-deployment.yaml"
+      mode {
+        value = "0o600"
+      }
+      contents {
+        inline =
+          (
+            (postgres_manifest) {
+              podName = "kea-pg"
+              inputs = new postgres_manifest.PostgresInputs {
+                postgres {
+                  host_ip = "10.255.255.9"
+                  host_port = 5432
+                  init_script_content =
+                    """
+                    #/bin/ash
+                    set -eux
+                    psql -v ON_ERROR_STOP=1 --username $POSTGRES_USER --dbname $POSTGRES_DB <<- EOSQL
+                      CREATE ROLE $KEA_DB_USERNAME LOGIN PASSWORD '$KEA_DB_PASSWORD';
+                      CREATE DATABASE $KEA_DB_DATABASE WITH OWNER = $KEA_DB_USERNAME ENCODING = 'UTF8';
+                      GRANT ALL PRIVILEGES ON DATABASE $KEA_DB_DATABASE TO $KEA_DB_USERNAME
+                    EOSQL
+                    """
+                  extra_env = new Mapping {
+                    ["POSTGRES_USER"] = "postgres"
+                    ["POSTGRES_DB"] = "postgres"
+                    ["KEA_DB_USERNAME"] = "kea"
+                    ["KEA_DB_DATABASE"] = "kea"
+                  }
+                  extra_secrets = new Mapping {
+                    ["KEA_DB_PASSWORD"] = read("sops:/KEA_DB_PASSWORD").text.base64
+                    ["POSTGRES_PASSWORD"] = read("sops:/POSTGRES_PASSWORD").text.base64
+                  }                  
+                }
+              }
+            }
+          )
+            .output
+            .text
+      }
+    }
+    ["/opt/envoy/envoy-deployment.yaml"] {
+      path = "/opt/envoy/envoy-deployment.yaml"
+      mode {
+        value = "0o600"
+      }
+      contents {
+        inline =
+          (
+            (import("../../deployments/envoy/deployment.pkl")) {
+              envoy_configs =
+                (
+                  (
+                    (import("../../deployments/envoy/configmaps/envoy-configs.pkl")) {
+                      envoy_configs {
+                        ["envoy.yaml"] =
+                          (
+                            (envoyyaml) {
+                              host_dns_bind_ip = "172.16.13.2"
+                              host_dns_target_ip = "10.255.255.1"
+                              host_dns_target_port = 5301
+                              host_dot_bind_port = 853
+                              host_pdns_api_bind_ip = "172.16.13.2"
+                              host_pdns_apt_bind_port = 443
+                              host_pdns_api_target_ip = "10.255.255.1"
+                              host_pdns_apt_target_port = 8081
+                              dot_certificate_chain_path =
+                                "/etc/envoy/secrets/dns.infra.ams23.niule.xyz.crt"
+                              dot_private_key_path =
+                                "/etc/envoy/secrets/dns.infra.ams23.niule.xyz.key"
+                              pdnsapi_certificate_chain_path =
+                                "/etc/envoy/secrets/pdnsapi.infra.ams23.niule.xyz.crt"
+                              pdnsapi_private_key_path =
+                                "/etc/envoy/secrets/pdnsapi.infra.ams23.niule.xyz.key"
+                            }
+                          )
+                            .output
+                            .text
+                      }
+                    }
+                  ).resources
+                )
+              envoy_secrets =
+                (
+                  (
+                    (import("../../deployments/envoy/configmaps/envoy-secrets.pkl")) {
+                      envoy_secrets {
+                        ["dns.infra.ams23.niule.xyz.crt"] =
+                          read(
+                            "sopstar:\(module_dir)../certs/dot.lego.tar#certificates/dns.infra.ams23.niule.xyz.crt"
+                          ).text
+                        ["dns.infra.ams23.niule.xyz.key"] =
+                          read(
+                            "sopstar:\(module_dir)../certs/dot.lego.tar#certificates/dns.infra.ams23.niule.xyz.key"
+                          ).text
+                        ["pdnsapi.infra.ams23.niule.xyz.crt"] =
+                          read(
+                            "sopstar:\(module_dir)../certs/dot.lego.tar#certificates/pdnsapi.infra.ams23.niule.xyz.crt"
+                          ).text
+                        ["pdnsapi.infra.ams23.niule.xyz.key"] =
+                          read(
+                            "sopstar:\(module_dir)../certs/dot.lego.tar#certificates/pdnsapi.infra.ams23.niule.xyz.key"
+                          ).text
+                      }
+                    }
+                  ).resources
+                )
+            }
+          )
+            .output
+            .text
+      }
+    }
+    ...(import("etc/containers/systemd/podman_systemd.pkl")).files
+    for (algo in List("rsa", "ed25519", "ecdsa")) {
+      ["/etc/ssh/ssh_host_\(algo)_key.pub"] {
+        path = "/etc/ssh/ssh_host_\(algo)_key.pub"
+        mode {
+          value = "0o600"
+        }
+        contents {
+          inline = read(path.drop(1)).text
+        }
+      }
+      ["/etc/ssh/ssh_host_\(algo)_key"] {
+        path = "/etc/ssh/ssh_host_\(algo)_key"
+        mode {
+          value = "0o600"
+        }
+        contents {
+          inline = read("sopsblob:\(module_dir)etc/ssh/ssh_host_\(algo)_key").text
+        }
+      }
+    }
+  }
+}

@@ -1,7 +1,16 @@
 amends "pkl:Project"
 
 dependencies {
+  ["dhcp"] = import("../deployments/dhcp/PklProject")
+  ["dns"] = import("../deployments/dns/PklProject")
+  ["postgres"] = import("../deployments/postgres/PklProject")
   ["fcos_butane"] {
     uri = "package://pkg.pkl-lang.org/github.com/niule-eu/fcos_butane.v1.6.0/fcos_butane.v1.6.0@0.2.3"
+  }
+  ["k8s"] {
+    uri = "package://pkg.pkl-lang.org/pkl-k8s/k8s@1.2.1"
+  }
+  ["net"] {
+    uri = "package://pkg.pkl-lang.org/pkl-pantry/pkl.experimental.net@1.2.1"
   }
 }

@@ -1,0 +1,171 @@
+import "@fcos_butane/Storage.pkl"
+
+function fileMapping(type): Mapping<String, unknown> = new Mapping {
+  default = (key) -> (type) {
+    path = key
+    mode {
+      value = "0o600"
+    }
+  }
+}
+
+files: Mapping<String, Storage.File> = (fileMapping(Storage.File)) {
+  ["/etc/containers/systemd/envoy-bridge.network"] {
+    contents {
+      inline =
+        """
+        [Network]
+        Subnet=10.255.255.0/29
+        Gateway=10.255.255.1
+        Driver=bridge
+        DisableDNS=true
+        InterfaceName=envoy
+        IPAMDriver=host-local
+        Options=no_default_route=1
+
+        """
+    }
+  }
+  ["/etc/containers/systemd/envoy-macvlan.network"] {
+    contents {
+      inline =
+        """
+        [Network]
+        Subnet=172.16.13.0/24
+        Gateway=172.16.13.1
+        Driver=macvlan
+        DisableDNS=true
+        InterfaceName=enp2s0
+        IPAMDriver=host-local
+        Options=mode=bridge
+
+        """
+    }
+  }
+  ["/etc/containers/systemd/envoy.kube"] {
+    contents {
+      inline =
+        """
+        [Unit]
+        Requires=envoy-bridge-network.service envoy-macvlan-network.service
+        After=envoy-bridge-network.service envoy-macvlan-network.service
+
+        [Kube]
+        Yaml=/opt/envoy/envoy-deployment.yaml
+        Network=systemd-envoy-macvlan:ip=172.16.13.2,mac=92:88:3c:65:21:bd
+        Network=systemd-envoy-bridge:ip=10.255.255.2
+
+        [Install]
+        WantedBy=multi-user.target default.target
+
+        """
+    }
+  }
+  ["/etc/containers/systemd/dns.kube"] {
+    contents {
+      inline =
+        """
+        [Unit]
+        Requires=envoy-bridge-network.service
+        After=envoy-bridge-network.service
+
+        [Kube]
+        Yaml=/opt/dns/dns-deployment.yaml
+        Network=systemd-envoy-bridge
+
+        [Install]
+        WantedBy=multi-user.target default.target
+
+        """
+    }
+  }
+  ["/etc/containers/systemd/kea-bridge-infra.pod"] {
+    contents {
+      inline =
+        """
+        [Unit]
+        Requires=kea-bridge-network.service
+        After=kea-bridge-network.service
+
+        [Pod]
+        PodName=kea-bridge-infra
+        Network=systemd-kea-bridge
+        PodmanArgs=--infra-name=kea-bridge-infra
+
+        """
+    }
+  }
+  ["/etc/containers/systemd/kea-bridge.network"] {
+    contents {
+      inline =
+        """
+        [Network]
+        Subnet=10.255.255.8/29
+        Gateway=10.255.255.9
+        Driver=bridge
+        DisableDNS=true
+        InterfaceName=kea
+        IPAMDriver=host-local
+        Options=no_default_route=1
+
+        """
+    }
+  }
+  ["/etc/containers/systemd/kea-db.kube"] {
+    contents {
+      inline =
+        """
+        [Unit]
+        Requires=kea-bridge-network.service kea-bridge-infra-pod.service
+        After=kea-bridge-network.service kea-bridge-infra-pod.service
+
+        [Kube]
+        Yaml=/opt/kea/postgres-deployment.yaml
+        Network=systemd-kea-bridge
+
+        [Install]
+        WantedBy=multi-user.target default.target
+
+        """
+    }
+  }
+  ["/etc/containers/systemd/kea-macvlan.13.network"] {
+    contents {
+      inline =
+        """
+        [Network]
+        Subnet=172.16.13.0/24
+        Gateway=172.16.13.1
+        Driver=macvlan
+        DisableDNS=true
+        InterfaceName=VLAN13
+        IPAMDriver=host-local
+        Options=mode=bridge
+
+        """
+    }
+  }
+  ["/etc/containers/systemd/kea.kube"] {
+    contents {
+      inline =
+        """
+        [Unit]
+        Requires=kea-bridge-network.service kea-macvlan.13-network.service kea-bridge-infra-pod.service
+        After=kea-bridge-network.service kea-macvlan.13-network.service kea-db.service kea-bridge-infra-pod.service
+        
+        [Service]
+        WorkingDirectory=/opt/kea
+
+        [Kube]
+        Yaml=/opt/kea/kea-deployment.yaml
+        Network=systemd-kea-macvlan.13:ip=172.16.13.3,mac=1e:57:a3:bb:ee:08,interface_name=VLAN13
+        Network=systemd-kea-bridge
+        Network=systemd-envoy-bridge
+        
+        [Install]
+        WantedBy=multi-user.target default.target
+        
+        """
+    }
+  }
+}

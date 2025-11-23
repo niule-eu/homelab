@@ -1,0 +1,82 @@
+import "@fcos_butane/Storage.pkl"
+
+function fileMapping(type): Mapping<String, unknown> = new Mapping {
+  default = (key) -> (type) {
+    path = key
+    mode {
+      value = "0o600"
+    }
+  }
+}
+
+files: Mapping<String, Storage.File> = (fileMapping(Storage.File)) {
+  ["/etc/NetworkManager/system-connections/enp0s20f0u1.nmconnection"] {
+    contents {
+      inline = 
+        """
+        [connection]
+        id=enp0s20f0u1
+        type=ethernet
+        interface-name=enp0s20f0u1
+
+        [ethernet]
+        accept-all-mac-addresses=1
+
+        [ipv4]
+        method=disabled
+
+        [ipv6]
+        method=disabled
+
+        """
+    }
+  }
+  ["/etc/NetworkManager/system-connections/enp2s0.nmconnection"] {
+    contents {
+      inline =
+        """
+        [connection]
+        id=enp2s0
+        type=ethernet
+        interface-name=enp2s0
+
+        [ethernet]
+        accept-all-mac-addresses=1
+
+        [ipv4]
+        method=manual
+        dns=1.1.1.1;1.0.0.1;
+        address1=172.16.13.14/24
+        gateway=172.16.13.1
+
+        """
+    }
+  }
+  ["/etc/NetworkManager/system-connections/VLAN13.nmconnection"] {
+    contents {
+      inline =
+        """
+        [connection]
+        id=VLAN13
+        type=vlan
+        interface-name=VLAN13
+
+        [ethernet]
+
+        [vlan]
+        flags=1
+        id=13
+        parent=enp0s20f0u1
+
+        [ipv4]
+        method=disabled
+        #address1=172.16.13.3/24
+        #gateway=172.16.13.1
+
+        [ipv6]
+        method=disabled
+
+        """
+    }
+  }
+}

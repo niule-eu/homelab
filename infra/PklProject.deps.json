@@ -1,12 +1,41 @@
 {
   "schemaVersion": 1,
   "resolvedDependencies": {
+    "package://pkg.pkl-lang.org/pkl-k8s/k8s@1": {
+      "type": "remote",
+      "uri": "projectpackage://pkg.pkl-lang.org/pkl-k8s/k8s@1.2.1",
+      "checksums": {
+        "sha256": "be1eed3358d74de49bde6b67670639b795243e6a21c32ae98f03f404d019d16b"
+      }
+    },
+    "package://pkg.pkl-lang.org/pkl-pantry/pkl.experimental.net@1": {
+      "type": "remote",
+      "uri": "projectpackage://pkg.pkl-lang.org/pkl-pantry/pkl.experimental.net@1.2.1",
+      "checksums": {
+        "sha256": "0b82242e186d9d432ad34b3c60cb6df18a89dabcd1bb37111e47a2f852316e5f"
+      }
+    },
     "package://pkg.pkl-lang.org/github.com/niule-eu/fcos_butane.v1.6.0/fcos_butane.v1.6.0@0": {
       "type": "remote",
       "uri": "projectpackage://pkg.pkl-lang.org/github.com/niule-eu/fcos_butane.v1.6.0/fcos_butane.v1.6.0@0.2.3",
       "checksums": {
         "sha256": "1936ccd618aa96793eed5d513f3bd12115cb801682497085682e8e472fb69976"
       }
+    },
+    "package://example.com/dns-deployment@0": {
+      "type": "local",
+      "uri": "projectpackage://example.com/dns-deployment@0.1.0",
+      "path": "../deployments/dns"
+    },
+    "package://example.com/dhcp-deployment@0": {
+      "type": "local",
+      "uri": "projectpackage://example.com/dhcp-deployment@0.1.0",
+      "path": "../deployments/dhcp"
+    },
+    "package://example.com/postgres-deployment@0": {
+      "type": "local",
+      "uri": "projectpackage://example.com/postgres-deployment@0.1.0",
+      "path": "../deployments/postgres"
     }
   }
 }

@@ -1,0 +1,274 @@
+extends "../template.pkl"
+
+import "@net/net.pkl"
+
+class Pool4 {
+  pool: net.IPv4CIDRString
+  hidden _pool : net.IPv4Network = net.IPv4Network(pool)
+}
+
+class Reservation4 {
+  `hw-address`: net.MACAddressString
+  `ip-address`: net.IPv4AddressString
+  hostname: String?
+  hidden _hw_address: net.MACAddress = net.MACAddress(`hw-address`)
+  hidden _ip_address: net.IPv4Address = net.IPv4Address(`ip-address`)
+}
+
+const function _as_csv_record(listing: Listing<Any>, separator: String?) =
+  let (sep = separator ?? ", ")
+    listing.toList().map((item) -> item.toString()).join(sep)
+
+class KeaSubnet4 {
+  id: Int
+  hidden _subnet: net.IPv4Network = net.IPv4Network(subnet)
+  subnet: net.IPv4CIDRString
+  interface: String
+  pools: Listing<Pool4>(
+    (pools: Listing<Pool4>) ->
+      !pools.any((pool) ->
+        !(_subnet.contains(pool._pool.firstAddress) && _subnet.contains(pool._pool.firstAddress))
+      ),
+  ) =
+    _subnet
+      .subdivideTo(27)
+      .toList()
+      .map((network) -> new Pool4 { pool = network.toString() })
+      .drop(2)
+      .dropLast(1)
+      .toListing()
+  hidden dns_servers: Listing<net.IPv4AddressString> = new {}
+  hidden routers: Listing<net.IPv4AddressString> = new { _subnet.firstAddress.next().toString() }
+  reservations: Listing<Reservation4> = new {}
+  `ddns-replace-client-name` : String = "when-not-present"
+  `ddns-update-on-renew` : Boolean = true
+  `ddns-qualifying-suffix`: String
+  `ddns-send-updates` : Boolean = true
+  `ddns-override-client-update` : Boolean = true
+  `ddns-override-no-update` : Boolean = true
+
+  `option-data` = new Listing {
+    when (dns_servers.length > 0) {
+      new {
+        name = "domain-name-servers"
+        data = _as_csv_record(dns_servers, ", ")
+      }
+    }
+    new {
+      name = "routers"
+      data = _as_csv_record(routers, ", ")
+    }
+  }
+}
+
+class Inputs {
+  dhcp4_interfaces: Listing<String>
+  dhcp4_dns_servers: Listing<net.IPv4AddressString>
+  dhcp4_ddns_ip: String
+  dhcp4_ddns_port: Int
+  postgres_host: net.IPv4AddressString
+  postgres_database: String = "kea"
+  postgres_user: String = "kea"
+  postgres_password: String = "kea"
+  subnets: Listing<KeaSubnet4>
+  kea_admin_container_image: String = "docker.io/jonasal/kea-admin:3"
+}
+
+hidden inputs: Inputs
+
+local pg_conn_config = new {
+  type = "postgresql"
+  host = inputs.postgres_host
+  name = inputs.postgres_database
+  user = inputs.postgres_user
+  password = inputs.postgres_password
+}
+
+local dhcp4_json = new {
+  Dhcp4 = new {
+    `interfaces-config` = new {
+      interfaces = inputs.dhcp4_interfaces
+      `dhcp-socket-type` = "raw"
+    }
+    `multi-threading` = new {
+      `enable-multi-threading` = true
+      `thread-pool-size` = 2
+      `packet-queue-size` = 11 * 2
+    }
+    `valid-lifetime` = 4000
+    `renew-timer` = 1000
+    `rebind-timer` = 2000
+    `lease-database` = pg_conn_config
+    `hosts-database` = pg_conn_config
+    `hooks-libraries` = new Listing {
+      new {
+        library = "libdhcp_pgsql.so"
+      }
+    }
+    `dhcp-ddns` = new {
+      `enable-updates` = true
+      `server-ip` = inputs.dhcp4_ddns_ip
+      `server-port` = inputs.dhcp4_ddns_port
+    }
+    `option-data` = new Listing {
+      new {
+        name = "domain-name-servers"
+        data = inputs.dhcp4_dns_servers.join(", ")
+      }
+    }
+    subnet4 = inputs.subnets
+    loggers = new Listing {
+      new {
+        name = "kea-dhcp4"
+        severity = "INFO"
+        output_options = new Listing {
+          new {
+            output = "stdout"
+            pattern = "%D{%Y-%m-%d %H:%M:%S.%q} %-5p [%c/%i.%t] %m\n"
+          }
+        }
+      }
+    }
+  }
+}
+
+configMaps {
+  ["kea-config"] {
+    data {
+      ["dhcp4.json"] = (new JsonRenderer {}).renderValue(dhcp4_json)
+    }
+  }
+  ["kea-env"] {
+    data {
+      ["KEA_POSTGRES_HOST"] = inputs.postgres_host
+      ["KEA_POSTGRES_DB"] = inputs.postgres_database
+      ["KEA_POSTGRES_USER"] = inputs.postgres_user
+    }
+  }
+  ["kea-containerfile"] {
+    data {
+      ["Containerfile"] =
+        """
+        FROM docker.io/jonasal/kea-dhcp4-slim:3
+        COPY --from=docker.io/jonasal/kea-hooks:3 /hooks/libdhcp_pgsql.so /usr/local/lib/kea/hooks
+
+        RUN ldconfig
+        """
+    }
+  }
+  ["kea-init-script"] {
+    data {
+      ["init-script.sh"] =
+        """
+        #!/bin/bash
+        set -eux
+
+        handle_error() {
+          local exit_code=$?
+          local cmd="$BASH_COMMAND"
+
+          if [ $exit_code -eq 2 ]; then
+            echo "kea-admin reported existing database, aborting."
+            exit 0
+          else
+            exit $exit_code
+          fi
+        }
+
+        trap handle_error ERR
+
+        kea-admin db-init pgsql -h $KEA_POSTGRES_HOST -u $KEA_POSTGRES_USER -p $KEA_POSTGRES_PASSWORD -n $KEA_POSTGRES_DB
+        """
+    }
+  }
+}
+
+secrets {
+  ["kea-secrets"] {
+    data {
+      ["KEA_POSTGRES_PASSWORD"] = inputs.postgres_password.base64
+    }
+  }
+}
+
+volumes {
+  ["kea-config"] {
+    configMap {
+      name = "kea-config"
+    }
+  }
+  ["kea-init-script"] {
+    configMap {
+      name = "kea-init-script"
+    }
+  }
+}
+
+initContainers {
+  ["kea-postgres-init"] {
+    image = inputs.kea_admin_container_image
+    command {
+      "/bin/bash"
+    }
+    args {
+      "entrypoint.d/init-script.sh"
+    }
+    envFrom {
+      new {
+        configMapRef {
+          name = "kea-env"
+        }
+      }
+      new {
+        secretRef {
+          name = "kea-secrets"
+        }
+      }
+    }
+    volumeMounts {
+      new {
+        mountPath = "/entrypoint.d/init-script.sh:Z"
+        name = "kea-init-script"
+        subPath = "init-script.sh"
+      }
+    }
+  }
+}
+
+containers {
+  ["kea-dhcp4"] {
+    image = "kea-dhcp-image"
+    securityContext {
+      capabilities {
+        add {
+          "CAP_NET_ADMIN"
+          "CAP_NET_RAW"
+          "CAP_NET_BIND_SERVICE"
+        }
+      }
+    }
+    args {
+      "-c"
+      "/kea/config/dhcp4.json"
+    }
+    envFrom {
+      new {
+        configMapRef {
+          name = "kea-env"
+        }
+      }
+      new {
+        secretRef {
+          name = "kea-secrets"
+        }
+      }
+    }
+    volumeMounts {
+      new {
+        mountPath = "/kea/config/dhcp4.json"
+        subPath = "dhcp4.json"
+        name = "kea-config"
+      }
+    }
+  }
+}

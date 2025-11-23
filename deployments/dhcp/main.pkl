@@ -1,0 +1,44 @@
+extends "template.pkl"
+
+import "apps/Kea.pkl"
+
+podName: String = "dhcp"
+
+class DhcpInputs {
+  kea: Kea.Inputs
+}
+
+hidden inputs: DhcpInputs = new {
+  kea {
+    postgres_host = "127.0.0.1"
+    postgres_user = "kea"
+    postgres_password = "kea"
+    postgres_database = "kea"
+  }
+}
+
+local kea = (Kea) {
+  podName = module.podName
+  inputs = module.inputs.kea
+}
+
+
+configMaps {
+  ...kea.configMaps
+}
+
+secrets {
+  ...kea.secrets
+}
+
+volumes {
+  ...kea.volumes
+}
+
+initContainers {
+  ...kea.initContainers
+}
+
+containers {
+  ...kea.containers
+}

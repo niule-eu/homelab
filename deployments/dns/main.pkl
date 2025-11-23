@@ -1,0 +1,96 @@
+extends "template.pkl"
+
+import "apps/Coredns.pkl"
+import "apps/Ddns.pkl"
+import "apps/Pdns.pkl"
+
+podName : String = "dns"
+
+class DnsInputs {
+  coredns : Coredns.Inputs
+  ddns : Ddns.Inputs
+  pdns : Pdns.Inputs
+}
+
+hidden inputs : DnsInputs = new {
+  coredns {
+    upstream_dot {
+      ips {
+        "1.0.0.1"
+        "1.0.0.2"
+      }
+      tls_servername = "security.cloudflare-dns.com"
+    }
+    zones {
+      default {
+        cache_ttl_seconds = 60
+        target_port = 5300
+      }
+      new {
+        name = "infra.ams23.niule.xyz"
+      }
+    }
+    container_port = 5301
+    host_port = 5301
+    host_ip = "10.255.255.1"    
+  }
+  ddns {
+    container_port = 53001
+    host_port = 53001
+    host_ip = "10.255.255.1"
+    domains {
+      new {
+        domain_suffix = "infra.ams23.niule.xyz"
+        dns_servers {
+          new {
+            ip = "localhost"
+            port = 5300
+          }
+        }
+      }
+    }
+  }
+  pdns {
+    api_host_ip = "10.255.255.1"
+    api_key = "password"
+  }
+}
+
+local coredns = (Coredns) {
+  podName = module.podName
+  inputs = module.inputs.coredns
+}
+
+local ddns = (Ddns) {
+  podName = module.podName
+  inputs = module.inputs.ddns
+}
+
+local pdns = (Pdns) {
+  podName = module.podName
+  inputs = module.inputs.pdns
+}
+
+configMaps {
+  ...coredns.configMaps
+  ...ddns.configMaps
+  ...pdns.configMaps
+}
+
+volumes {
+  ...coredns.volumes
+  ...ddns.volumes
+  ...pdns.volumes
+}
+
+initContainers {
+  ...coredns.initContainers
+  ...ddns.initContainers
+  ...pdns.initContainers
+}
+
+containers {
+  ...coredns.containers
+  ...ddns.containers
+  ...pdns.containers
+}

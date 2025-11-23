@@ -8,3 +8,10 @@ dependencies {
     uri = "package://pkg.pkl-lang.org/pkl-pantry/pkl.experimental.net@1.2.1"
   }
 }
+
+package {
+  name = "dns-deployment"
+  baseUri = "package://example.com/\(name)"
+  version = "0.1.0"
+  packageZipUrl = "https://example.com/\(name)@\(version).zip"
+}

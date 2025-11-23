@@ -1,0 +1,132 @@
+extends "../template.pkl"
+
+import "@net/net.pkl"
+
+class IpPort {
+  ip: net.IPv4AddressString | "localhost"
+  port: Int
+}
+
+class DdnsDomain {
+  hidden domain_suffix : String
+  hidden dns_servers : Listing<IpPort>
+  
+  fixed name = domain_suffix.split(".").join(".") + "."
+  fixed `dns-servers` = 
+    dns_servers
+      .fold(
+        new Listing {}, 
+        (result : Listing, ip_port : IpPort) -> 
+          (result) { 
+            new {
+              when (ip_port.ip == "localhost") {
+                `ip-address` = "POD_NAME"
+              } else {
+                `ip-address` = ip_port.ip
+              }
+              port = ip_port.port
+            } 
+          }
+      )
+}
+
+class Inputs {
+  container_port : Int
+  host_port : Int
+  host_ip : net.IPv4AddressString
+  domains : Listing<DdnsDomain>
+  container_image : String = "docker.io/jonasal/kea-dhcp-ddns:3.1.3"
+}
+
+hidden inputs : Inputs
+
+local `dhcp-ddns_json` {
+  DhcpDdns {
+    `ip-address` = "POD_NAME"
+    port = inputs.container_port
+    `forward-ddns` {
+      `ddns-domains` = inputs.domains
+    }
+  }
+}
+
+configMaps {
+  ["ddns-templates"] {
+    data {
+      ["dhcp-ddns.json"] = 
+        (new JsonRenderer {}).renderValue(`dhcp-ddns_json`)
+        .replaceAll("POD_NAME", "{{ net.LookupIP (env.Getenv \"POD_NAME\") }}")
+    }
+  }
+}
+
+volumes {
+  ["ddns-templates"] {
+    configMap {
+      name = "ddns-templates"
+    }
+  }
+  ["ddns-config"] {
+    persistentVolumeClaim {
+      claimName = "ddns-config"
+    }
+  }
+}
+
+initContainers {
+  ["ddns-template"] {
+    name = "ddns-template"
+    image = "docker.io/hairyhenderson/gomplate:stable"
+    env {
+      new {
+        name = "POD_NAME"
+        valueFrom {
+          fieldRef {
+            fieldPath = "metadata.name"
+          }
+        }                  
+      }
+    }
+    args {
+      "--input-dir"
+      "/templates"
+      "--output-dir"
+      "/kea/config/"
+    }
+    volumeMounts {
+      new {
+        mountPath = "/templates/:Z"
+        name = "ddns-templates"
+      }
+      new {
+        mountPath = "/kea/config/:Z"
+        name = "ddns-config"
+      }
+    }
+  }
+}
+
+containers {
+  ["kea-dhcp-ddns"] {
+    image = inputs.container_image
+    args {
+      "-c"
+      "/kea/config/dhcp-ddns.json"
+    }
+    ports {
+      new {
+        containerPort = inputs.container_port
+        hostPort = inputs.host_port
+        hostIP = inputs.host_ip
+        protocol = "UDP"
+      }
+    }
+    volumeMounts {
+      new {
+        mountPath = "/kea/config/dhcp-ddns.json"
+        subPath = "dhcp-ddns.json"
+        name = "ddns-config"
+      }
+    }
+  }
+}

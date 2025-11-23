@@ -1,0 +1,118 @@
+extends "../template.pkl"
+
+import "@net/net.pkl"
+
+class Inputs {
+  dns_container_port : Int = 5300
+  api_host_ip  : net.IPv4AddressString
+  api_container_port : Int = 8081
+  api_host_port : Int = 8081
+  api_key : String
+  allow_dnsupdate_from : net.IPv4CIDRString
+}
+
+hidden inputs : Inputs
+
+configMaps {
+  ["pdns-config"] {
+    data {
+      ["pdns.conf"] = """
+        local-port=\(inputs.dns_container_port)
+        log-dns-queries=yes
+        log-dns-details=yes
+        loglevel=6
+        webserver-port=\(inputs.api_container_port)
+        api-key=\(inputs.api_key)
+        dnsupdate=yes
+        allow-dnsupdate-from=\(inputs.allow_dnsupdate_from)
+        """
+    }
+  }
+  ["pdns-secrets"] {
+    data {
+      ["PDNS_AUTH_API_KEY"] = inputs.api_key.base64
+    }
+  }
+  ["pdns-sqlite3-schema"] {
+    data {
+      ["schema.sql"] = read("https://raw.githubusercontent.com/PowerDNS/pdns/refs/heads/master/modules/gsqlite3backend/schema.sqlite3.sql").text  
+    }
+  } 
+}
+
+volumes {
+  ["pdns-sqlite3"] {
+    persistentVolumeClaim {
+      claimName = "pdns-sqlite3"
+    }
+  }
+  ["pdns-sqlite3-schema"] {
+    configMap {
+      name = "pdns-sqlite3-schema"
+    }
+  }
+  ["pdns-config"] {
+    configMap {
+      name = "pdns-config"
+    }
+  }
+}
+
+initContainers {
+  ["sqlite3-init"] {
+    image = "docker.io/powerdns/pdns-auth-master:latest"
+    command {
+      "sqlite3"
+    }
+    args {
+      "-init"
+      "/tmp/schema.sql"
+      "/var/lib/powerdns/pdns.sqlite3"
+    }
+    volumeMounts {
+      new {
+        mountPath = "/var/lib/powerdns/:Z"
+        name = "pdns-sqlite3"
+      }
+      new {
+        mountPath = "/tmp/schema.sql:Z"
+        name = "pdns-sqlite3-schema"
+        subPath = "schema.sql"
+      }
+    }    
+  }
+}
+
+containers {
+  ["pdns-auth"] {              
+    image = "docker.io/powerdns/pdns-auth-master:latest"
+    ports {
+      new {
+        containerPort = inputs.api_container_port
+        hostIP = inputs.api_host_ip
+        hostPort = inputs.api_host_port
+        protocol = "TCP"
+      }
+    }
+    envFrom {
+      new {
+        configMapRef {
+          name = "pdns-secrets"
+          optional = false
+        }
+      }
+    }
+    volumeMounts {
+      new {
+        mountPath = "/var/lib/powerdns/:Z"
+        name = "pdns-sqlite3"
+      }
+      new {
+        mountPath = "/etc/powerdns/pdns.d/pdns.conf:Z"
+        name = "pdns-config"
+        subPath = "pdns.conf"
+        readOnly = true
+      }
+    }  
+  }
+}

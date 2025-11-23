@@ -1,0 +1,152 @@
+extends "../template.pkl"
+
+import "@net/net.pkl"
+
+class FwdZone {
+  name : String
+  cache_ttl_seconds : Int = 60
+  target_port : Int
+  target_ip : net.IPv4AddressString?
+  debug : Boolean = false
+}
+
+class UpstreamDNSoverTLS {
+  ips : Listing<net.IPv4AddressString>
+  tls_servername : String
+  fixed uris = ips.toList().map((ip) -> "tls://\(net.IPv4Address(ip))")
+}
+
+class Inputs {
+  zones : Listing<FwdZone>
+  upstream_dot : UpstreamDNSoverTLS
+  coredns_image : String = "docker.io/coredns/coredns:latest"
+  host_ip : net.IPv4AddressString
+  host_port : Int = 5301
+  container_port : Int = 5301
+}
+
+function CorefileFwdZone(zone : FwdZone) : String = 
+  let (ip = zone.target_ip.ifNonNull((item) -> item.toString()) ?? "{{ net.LookupIP (env.Getenv \"POD_NAME\") -}}")
+  let (debug = if (zone.debug) "{{ print \"\\ndebug\" | strings.Indent 2 }}" else "")
+  """
+  \(zone.name) {
+    cache \(zone.cache_ttl_seconds)
+    forward . \(ip):\(zone.target_port)
+    log\(debug)
+  }
+  """
+
+hidden inputs : Inputs
+
+configMaps {
+  ["coredns-templates"] {
+    data {
+      for (zone in inputs.zones) {
+        [zone.name] = CorefileFwdZone(zone)
+      }
+    }
+  }
+  ["coredns-config"] {
+    data {
+      ["Corefile"] = """
+        import ./Corefile.d/*
+
+        . {
+          cache 60
+          log
+          forward . \(inputs.upstream_dot.uris.join(" ")) {
+            tls_servername \(inputs.upstream_dot.tls_servername)
+          }
+        }
+        """
+    }
+  }
+}
+
+volumes {
+  ["coredns-config"] {
+    configMap {
+      name = "coredns-config"
+    }
+  }
+  ["coredns-templates"] {
+    configMap {
+      name = "coredns-templates"
+    }
+  }
+  ["coredns-config-d"] {
+    persistentVolumeClaim {
+      claimName = "coredns-config-d"
+    }
+  }
+}
+
+initContainers {
+  ["corefile-template"] {
+    name = "corefile-template"
+    image = "docker.io/hairyhenderson/gomplate:stable"
+    env {
+      new {
+        name = "POD_NAME"
+        valueFrom {
+          fieldRef {
+            fieldPath = "metadata.name"
+          }
+        }                  
+      }
+    }
+    args {
+      "--input-dir"
+      "/templates"
+      "--output-dir"
+      "/etc/coredns/Corefile.d"
+    }
+    volumeMounts {
+      new {
+        mountPath = "/templates/:Z"
+        name = "coredns-templates"
+      }
+      new {
+        mountPath = "/etc/coredns/Corefile.d/:Z"
+        name = "coredns-config-d"
+      }
+    }
+  }
+}
+
+containers {
+  ["coredns-fwdr"] {
+    image = inputs.coredns_image
+    args {
+      "-conf"
+      "/etc/coredns/Corefile"
+      "-dns.port"
+      "\(inputs.container_port)"
+    }
+    ports {
+      new {
+        hostIP = inputs.host_ip
+        hostPort = inputs.host_port
+        containerPort = inputs.container_port
+        protocol = "TCP"
+      }
+      new {
+        hostIP = inputs.host_ip
+        hostPort = inputs.host_port
+        containerPort = inputs.container_port
+        protocol = "UDP"
+      }
+    }
+    volumeMounts {
+      new {
+        mountPath = "/etc/coredns/Corefile:Z"
+        name = "coredns-config"
+        subPath = "Corefile"
+      }
+      new {
+        mountPath = "/etc/coredns/Corefile.d/:Z"
+        name = "coredns-config-d"
+      }
+    }
+  }
+}

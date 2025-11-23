@@ -34,4 +34,6 @@ D("infra.ams23.niule.xyz", REG_NONE, DnsProvider(DSP_PDNS), {no_ns: 'true'},
     A("dns", "172.16.13.2"),
     A("pdnsapi", "172.16.13.2"),
     A("bpir4", "172.16.13.1"),
+    IGNORE("", "DHCID"),
+    IGNORE("", "A", "172.16.13.{3[1-9],[4-9]?,1??,22[4-9],2[3-5]?}") // Ignores A Records with IPs between 172.16.13.32 - 172.16.13.224 (leaves 172.16.13.0/27 and 172.16.13.224/27 for DHCP)
 )

@@ -20,6 +20,14 @@ sudo coreos-installer install /dev/sda --ignition-url http://172.16.13.1:9714/m7
 
 ## Radxa X4
 
+### SSH Host keys
+
+``` bash
+hlcli keygen -o infra/radxax4/etc/ssh/ssh_host_ed25519_key -comment radxax4 ed25519
+hlcli keygen -o infra/radxax4/etc/ssh/ssh_host_ecdsa_key -comment radxax4 ecdsa -b 384
+hlcli keygen -o infra/radxax4/etc/ssh/ssh_host_rsa_key -comment radxax4 rsa -b 4096
+```
+
 ### Create macvlan network
 
 ``` bash
@@ -75,7 +83,7 @@ hlcli render-pkl -m infra/dns/creds.pkl | dnscontrol push --config infra/dns/dns
 
 ### Generate a cert with lego
 
-> Note: The lego state is stored in a podman named volume named "got-lego". The contents of that volume are exported to `infra/certs/dot.lego.tar`.
+> Note: The lego state is stored in a podman named volume named "dot-lego". The contents of that volume are exported to `infra/certs/dot.lego.tar`.
 
 ``` bash
 hlcli render-pkl -m infra/certs/dns.infra.ams23.niule.xyz.pkl | podman kube play --replace -

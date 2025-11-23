@@ -8,7 +8,7 @@ ovh {
 
 powerdns {
   TYPE = "POWERDNS"
-  apiKey = "password"
+  apiKey = read("sops:/PDNS_API_KEY").text
   apiUrl = "https://pdnsapi.infra.ams23.niule.xyz"
   serverName = "localhost"
 }

@@ -7,3 +7,7 @@
 [submodule "fcos_butane.v1.6.0"]
 	path = fcos_butane.v1.6.0
 	url = git@github.com:niule-eu/fcos_butane.v1.6.0.git
+[submodule "infra/k0s-github-arc"]
+	path = infra/k0s-github-arc
+	url = git@github.com:niule-eu/k0s-github-arc.git
+	branch = main

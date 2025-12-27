@@ -1,0 +1,19 @@
+{
+  "Connection": {
+    "Default": "host",
+    "Connections": {
+      "host": {
+        "URI": "unix://run/user/2000/podman/podman.sock"
+      },
+      "radxax4": {
+        "URI": "ssh://core@172.16.13.14:22/run/user/1000/podman/podman.sock",
+        "Identity": "/home/niule/.ssh/id_ed25519"
+      },
+      "radxax4_root": {
+        "URI": "ssh://root@172.16.13.14:22/run/podman/podman.sock",
+        "Identity": "/home/niule/.ssh/id_ed25519"
+      }
+    }
+  },
+  "Farm": {}
+}

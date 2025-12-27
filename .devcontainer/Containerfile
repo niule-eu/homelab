@@ -1,3 +1,5 @@
+ARG KUBECTL_IMAGE_1_34_2
+
 # Download golang and extract to tmp
 FROM curlimages/curl:latest as golang
 
@@ -93,6 +95,22 @@ RUN <<EOF /bin/sh
     rm -rf sd.tar.gz
 EOF
 
+# Download flux and move to /tmp
+FROM curlimages/curl:latest as flux
+
+ARG FLUXCD_FLUX2_URL
+ARG FLUXCD_FLUX2_HASH
+
+RUN <<EOF /bin/sh
+    set -eux
+    curl -H "Accept: application/octet-stream" -Lo flux.tar.gz ${FLUXCD_FLUX2_URL}
+    echo "${FLUXCD_FLUX2_HASH} flux.tar.gz" | sha256sum -c
+    tar -C /tmp/ -xzf flux.tar.gz
+    rm -rf flux.tar.gz
+EOF
+
+FROM $KUBECTL_IMAGE_1_34_2 as kubectl_1_34_2
+
 FROM fedora-minimal:42
 
 ARG USERID
@@ -101,11 +119,13 @@ ARG USERNAME
 
 RUN dnf update -y && dnf install -y --setopt=install_weak_deps=False \
     git \
+    age \
     bash-completion \
     tar \
     bzip2 \
     gzip \
     butane \
+    helm-0:3.19.0-1.fc42.x86_64 \
     yq jq
 
 COPY --chown=root:root --chmod=0755 --from=golang /tmp/go /usr/local/go
@@ -117,6 +137,9 @@ COPY --chown=root:root --chmod=0755 --from=java  /opt/java /opt/java
 COPY --chown=root:root --chmod=0755 --from=dnscontrol /tmp/dnscontrol /usr/local/bin/
 COPY --chown=root:root --chmod=0755 --from=sd /tmp/sd /usr/local/bin/
 COPY --chown=root:root --chmod=0644 --from=sd /tmp/completions/sd.bash /usr/share/bash-completion/completions/sd
+COPY --chown=root:root --chmod=0755 --from=kubectl_1_34_2 /bin/kubectl /usr/local/bin/
+COPY --chown=root:root --chmod=0755 --from=flux /tmp/flux /usr/local/bin
+
 
 # create container user
 RUN <<EOF /bin/bash
@@ -147,19 +170,7 @@ USER $USERNAME
 
 ENV PATH="$PATH:/opt/java/openjdk/bin"
 
-COPY --chown=$USERNAME:$USERNAME <<EOF /home/$USERNAME/.config/containers/podman-connections.json
-    {
-      "Connection": { 
-        "Default": "host",
-          "Connections": { 
-            "host": {
-              "URI": "unix://run/user/2000/podman/podman.sock"
-            }
-          }
-      },
-      "Farm": {}
-    }
-EOF
+COPY --chown=$USERNAME:$USERNAME podman-connections.json /home/$USERNAME/.config/containers/podman-connections.json
 
 COPY --chown=$USERNAME:$USERNAME <<podman-alias <<"gopath-bin" <<"dnscontrol-completion" /home/$USERNAME/.bashrc.d/
     alias podman='podman-remote'

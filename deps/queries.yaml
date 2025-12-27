@@ -24,3 +24,7 @@
 - repo: doh-server
   owner: dnscrypt
   pattern: 'linux-x86_64.tar.bz2$'
+- repo: flux2
+  owner: fluxcd
+  pattern: '^flux.*linux_amd64\.tar\.gz$'
+  checksums_pattern: '^flux.*checksums.txt$'

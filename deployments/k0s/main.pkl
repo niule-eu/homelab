@@ -1,0 +1,32 @@
+extends "template.pkl"
+
+// hlcli render-pkl -m k0s.pkl | podman -c radxax4_root kube play --network systemd-k0s-macvlan:mac=62:68:1d:91:bf:c4 --replace -
+
+import "apps/K0S.pkl"
+
+podName = "k0s"
+podHostName = "k0s-controller"
+
+configMaps {
+  ...K0S.configMaps
+}
+
+secrets {
+  ...K0S.secrets
+}
+
+persistentVolumeClaims {
+  ...K0S.persistentVolumeClaims
+}
+
+initContainers {
+  ...K0S.initContainers
+}
+
+containers {
+  ...K0S.containers
+}
+
+volumes {
+  ...K0S.volumes
+}

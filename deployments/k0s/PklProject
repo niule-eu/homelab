@@ -1,0 +1,17 @@
+amends "pkl:Project"
+
+dependencies {
+  ["k8s"] {
+    uri = "package://pkg.pkl-lang.org/pkl-k8s/k8s@1.2.1"
+  }
+  ["net"] {
+    uri = "package://pkg.pkl-lang.org/pkl-pantry/pkl.experimental.net@1.2.1"
+  }
+}
+
+package {
+  name = "dns-deployment"
+  baseUri = "package://example.com/\(name)"
+  version = "0.1.0"
+  packageZipUrl = "https://example.com/\(name)@\(version).zip"
+}

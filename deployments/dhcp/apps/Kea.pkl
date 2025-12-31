@@ -116,6 +116,7 @@ local dhcp4_json = new {
         data = inputs.dhcp4_dns_servers.join(", ")
       }
     }
+    `match-client-id` = false
     subnet4 = inputs.subnets
     loggers = new Listing {
       new {

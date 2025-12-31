@@ -1,23 +1,38 @@
 extends "@fcos_butane/ButaneFcos.pkl"
 import "@fcos_butane/Storage.pkl"
 
+local dir_parts = List(".config", "systemd", "user", "sockets.target.wants")
+local dirs = dir_parts.foldIndexed(
+  Map(), 
+  (i, acc, elem) -> (
+    let (name = "/home/core/\(dir_parts.take(i + 1).join("/"))")
+      Map(name, new Storage.Directory {
+        group { id = 1000 }
+        user { id = 1000 }
+        mode { value = "0o755" }
+        path = name
+      }) + acc
+  )
+)
+.toMapping()
+
 passwd {
-    users {
-        ["core"] {
-            name = "core"
-            uid = 1000
-            groups {
-              "sudo"
-              "wheel"
-            }
-            when (core_password_hash != null) {
-              password_hash = core_password_hash
-            }
-            ssh_authorized_keys {
-              "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC9AaghNePDNxI//W6OX6Yp6gssMpDUzK+4XoUiXnRZE fedora-sway-atomic@niuleh.eu"
-            }
-        }
+  users {
+    ["core"] {
+      name = "core"
+      uid = 1000
+      groups {
+        "sudo"
+        "wheel"
+      }
+      when (core_password_hash != null) {
+        password_hash = core_password_hash
+      }
+      ssh_authorized_keys {
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC9AaghNePDNxI//W6OX6Yp6gssMpDUzK+4XoUiXnRZE fedora-sway-atomic@niuleh.eu"
+      }
     }
+  }
 }
 
 systemd {
@@ -48,23 +63,24 @@ storage {
         hard = false
       }
     }
+    when (enable_rootful_podman_socket == true) {
+      ["/etc/systemd/system/sockets.target.wants/podman.socket"] {
+        path = "/etc/systemd/system/sockets.target.wants/podman.socket"
+        target = "/usr/lib/systemd/podman.socket"
+        user {
+          id = 0
+        }
+        group {
+          id = 0
+        }
+        hard = false
+      }
+    }
   }
-  when (enable_linger == true) {
-    directories = 
-      let (dir_parts = List(".config", "systemd", "user", "sockets.target.wants"))
-        dir_parts.foldIndexed(
-          Map(), 
-          (i, acc, elem) -> (
-            let (name = "/home/core/\(dir_parts.take(i + 1).join("/"))")
-              Map(name, new Storage.Directory {
-                group { id = 1000 }
-                user { id = 1000 }
-                mode { value = "0o755" }
-                path = name
-              }) + acc
-          )
-        )
-        .toMapping()
+  when (enable_linger) {
+    directories {
+      ...dirs
+    }
   }
   files {
     when (enable_linger == true) {
@@ -133,3 +149,4 @@ hidden disable_stub_listener : Boolean = false
 hidden core_password_hash : String? = null
 hidden nm_no_auto_default : Listing<String> = new Listing {}
 hidden enable_linger : Boolean = false
+hidden enable_rootful_podman_socket = false

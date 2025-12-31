@@ -126,7 +126,8 @@ RUN dnf update -y && dnf install -y --setopt=install_weak_deps=False \
     gzip \
     butane \
     helm-0:3.19.0-1.fc42.x86_64 \
-    yq jq
+    yq jq \
+    openssl
 
 COPY --chown=root:root --chmod=0755 --from=golang /tmp/go /usr/local/go
 COPY --chown=root:root --chmod=0755 --from=sops /tmp/sops /usr/local/bin/

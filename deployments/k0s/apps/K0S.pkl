@@ -1,0 +1,103 @@
+extends "../template.pkl"
+
+import "@net/net.pkl"
+import "@k8s/api/core/v1/PersistentVolumeClaim.pkl"
+
+local k0s_yaml {
+  apiVersion = "k0s.k0sproject.io/v1beta1"
+  kind = "ClusterConfig"
+  metadata {
+    name = "k0s-single-node"
+  }
+  spec {
+    storage {
+      type = "kine"
+    }
+  }
+}
+
+configMaps {
+  ["k0s-cluster-config"] {
+    data {
+      ["k0s.yaml"] = (new YamlRenderer {}).renderValue(k0s_yaml)
+    }
+  }
+}
+
+volumes {
+  ["k0s-var-lib-k0s"] {
+    persistentVolumeClaim {
+      claimName = "k0s-var-lib-k0s"
+    }
+  }
+  ["k0s-var-log-pods"] {
+    persistentVolumeClaim {
+      claimName = "k0s-var-log-pods"
+    }
+  }
+  ["k0s-cluster-config"] {
+    persistentVolumeClaim {
+      claimName = "k0s-cluster-config"
+    }
+  }
+  ["k0s-tmpfs"] {
+    persistentVolumeClaim {
+      claimName = "k0s-tmpfs"
+    }
+  }
+}
+
+persistentVolumeClaims {
+  ["k0s-tmpfs"] {
+    metadata {
+      annotations {
+        ["volume.podman.io/type"] = "tmpfs"
+        ["volume.podman.io/device"] = "tmpfs"
+        ["volume.podman.io/mount-options"] = "exec"        
+      }
+    }
+    spec {
+      accessModes {
+        "ReadWriteOnce"
+      }
+      resources {
+        requests {
+          ["storage"] = "1Gi"
+        }
+      }
+    }
+  }
+}
+
+containers {
+  ["controller"] {
+    image = "docker.io/k0sproject/k0s:v1.34.2-k0s.0"
+    securityContext {
+      privileged = true
+    }
+    args {
+      "k0s"
+      "controller"
+      "--single"
+    }
+    volumeMounts {
+      new {
+        name = "k0s-tmpfs"
+        mountPath = "/run"
+      }
+      new {
+        name = "k0s-cluster-config"
+        mountPath = "/etc/k0s/k0s.yaml"
+        subPath = "k0s.yaml"
+      }
+      new {
+        name = "k0s-var-log-pods"
+        mountPath = "/var/log/pods"
+      }
+      new {
+        name = "k0s-var-lib-k0s"
+        mountPath = "/var/lib/k0s"
+      }
+    }
+  }
+}

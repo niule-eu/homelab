@@ -16,10 +16,77 @@ hostname = "radxax4"
 disable_stub_listener = true
 nm_no_auto_default = new {}
 enable_linger = true
+enable_rootful_podman_socket = true
+
+// passwd {
+//   groups {
+//     ["libvirt"] {
+//       name = "libvirt"
+//       system = true
+//     }
+//   }
+//   users {
+//     ["core"] {
+//       groups {
+//         "libvirt"
+//       }
+//     }
+//   }
+// }
+
+systemd {
+  units {
+    ["netavark-dhcp-proxy.socket"] {
+      name = "netavark-dhcp-proxy.socket"
+      enabled = true
+    }
+  }
+}
 
 storage {
+  directories {
+    ["/root/.ssh"] {
+      path = "/root/.ssh"
+      mode {
+        value = "0o700"
+      }
+      user {
+        id = 0
+      }
+      group {
+        id = 0
+      }
+    }
+    ["/root/.ssh/authorized_keys.d"] {
+      path = "/root/.ssh/authorized_keys.d"
+      mode {
+        value = "0o700"
+      }
+      user {
+        id = 0
+      }
+      group {
+        id = 0
+      }
+    }
+  }
   files {
     ...(import("etc/NetworkManager/system-connections/nmconnections.pkl")).files
+    ["/root/.ssh/authorized_keys.d/core"] {
+      path = "/root/.ssh/authorized_keys.d/core"
+      mode {
+        value = "0o600"
+      }
+      user {
+        id = 0
+      }
+      group {
+        id = 0
+      }
+      contents {
+        inline = (module.passwd.users.getOrNull("core")).ssh_authorized_keys.join("\n")
+      }
+    }
     ["/opt/dns/dns-deployment.yaml"] {
       path = "/opt/dns/dns-deployment.yaml"
       mode {
@@ -51,17 +118,19 @@ storage {
                   container_port = 5301
                   host_port = 5301
                   host_ip = "10.255.255.1"
+                  bind_interface_name = "envoy-bridge"
                 }
                 ddns {
                   container_port = 53001
                   host_port = 53001
                   host_ip = "10.255.255.1"
+                  bind_interface_name = "envoy-bridge"
                   domains {
                     new {
                       domain_suffix = "infra.ams23.niule.xyz"
                       dns_servers {
                         new {
-                          ip = "172.16.13.2"
+                          ip = "localhost"
                           port = 5300
                         }
                       }
@@ -125,6 +194,11 @@ storage {
                           `hw-address` = "10:02:b5:86:1a:1f"
                           `ip-address` = "172.16.13.14"
                           hostname = "radxax4"
+                        }
+                        new {
+                          `hw-address` = "62:68:1d:91:bf:c4"
+                          `ip-address` = "172.16.13.41"
+                          hostname = "k0s-controller"
                         }
                       }
                     }

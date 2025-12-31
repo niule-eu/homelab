@@ -66,15 +66,31 @@ files: Mapping<String, Storage.File> = (fileMapping(Storage.File)) {
       inline =
         """
         [Unit]
-        Requires=envoy-bridge-network.service
-        After=envoy-bridge-network.service
+        Requires=envoy-bridge-network.service dns-bridge-network.service
+        After=envoy-bridge-network.service dns-bridge-network.service
 
         [Kube]
         Yaml=/opt/dns/dns-deployment.yaml
-        Network=systemd-envoy-bridge
+        Network=systemd-envoy-bridge:interface_name=envoy-bridge
+        Network=systemd-dns-bridge
 
         [Install]
         WantedBy=multi-user.target default.target
+
+        """
+    }
+  }
+  ["/etc/containers/systemd/dns-bridge.network"] {
+    contents {
+      inline =
+        """
+        [Network]
+        Subnet=10.255.254.0/30
+        Gateway=10.255.254.1
+        Driver=bridge
+        DisableDNS=true
+        InterfaceName=dns
+        IPAMDriver=host-local
 
         """
     }
@@ -166,6 +182,19 @@ files: Mapping<String, Storage.File> = (fileMapping(Storage.File)) {
         WantedBy=multi-user.target default.target
         
         """
+    }
+  }
+  ["/etc/containers/systemd/k0s-macvlan.network"] {
+    contents {
+      inline =
+      """
+      [Network]
+      Driver=macvlan
+      DisableDNS=true
+      InterfaceName=enp2s0
+      IPAMDriver=dhcp
+      Options=mode=bridge      
+      """
     }
   }
 }

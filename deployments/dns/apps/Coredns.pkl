@@ -23,16 +23,18 @@ class Inputs {
   host_ip : net.IPv4AddressString
   host_port : Int = 5301
   container_port : Int = 5301
+  bind_interface_name : String
 }
 
 function CorefileFwdZone(zone : FwdZone) : String = 
-  let (ip = zone.target_ip.ifNonNull((item) -> item.toString()) ?? "{{ net.LookupIP (env.Getenv \"POD_NAME\") -}}")
+  let (ip = zone.target_ip.ifNonNull((item) -> item.toString()) ?? "{{ sockaddr.GetInterfaceIP (env.Getenv \"BIND_INTERFACE_NAME\") -}}")
   let (debug = if (zone.debug) "{{ print \"\\ndebug\" | strings.Indent 2 }}" else "")
   """
   \(zone.name) {
-    cache \(zone.cache_ttl_seconds)
     forward . \(ip):\(zone.target_port)
+    errors
     log\(debug)
+    cache \(zone.cache_ttl_seconds)
   }
   """
 
@@ -52,11 +54,12 @@ configMaps {
         import ./Corefile.d/*
 
         . {
-          cache 60
-          log
           forward . \(inputs.upstream_dot.uris.join(" ")) {
             tls_servername \(inputs.upstream_dot.tls_servername)
           }
+          errors
+          log
+          cache 60
         }
         """
     }
@@ -87,12 +90,8 @@ initContainers {
     image = "docker.io/hairyhenderson/gomplate:stable"
     env {
       new {
-        name = "POD_NAME"
-        valueFrom {
-          fieldRef {
-            fieldPath = "metadata.name"
-          }
-        }                  
+        name = "BIND_INTERFACE_NAME"
+        value = inputs.bind_interface_name        
       }
     }
     args {

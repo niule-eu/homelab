@@ -111,11 +111,12 @@ EOF
 
 FROM $KUBECTL_IMAGE_1_34_2 as kubectl_1_34_2
 
-FROM fedora-minimal:42
+FROM fedora-minimal:43
 
 ARG USERID
 ARG GROUPID
 ARG USERNAME
+ARG ASTRAL_SH_UV_TAG
 
 RUN dnf update -y && dnf install -y --setopt=install_weak_deps=False \
     git \
@@ -125,7 +126,7 @@ RUN dnf update -y && dnf install -y --setopt=install_weak_deps=False \
     bzip2 \
     gzip \
     butane \
-    helm-0:3.19.0-1.fc42.x86_64 \
+    helm-0:3.19.0-1.fc43.x86_64 \
     yq jq \
     openssl
 
@@ -140,7 +141,7 @@ COPY --chown=root:root --chmod=0755 --from=sd /tmp/sd /usr/local/bin/
 COPY --chown=root:root --chmod=0644 --from=sd /tmp/completions/sd.bash /usr/share/bash-completion/completions/sd
 COPY --chown=root:root --chmod=0755 --from=kubectl_1_34_2 /bin/kubectl /usr/local/bin/
 COPY --chown=root:root --chmod=0755 --from=flux /tmp/flux /usr/local/bin
-
+COPY --from=ghcr.io/astral-sh/uv:$ASTRAL_SH_UV_TAG /uv /uvx /bin/
 
 # create container user
 RUN <<EOF /bin/bash

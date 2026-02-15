@@ -1,0 +1,107 @@
+open module Template
+
+import "pkl:reflect"
+
+import "@k8s/api/apps/v1/Deployment.pkl"
+import "@k8s/api/core/v1/ConfigMap.pkl"
+import "@k8s/api/core/v1/PersistentVolumeClaim.pkl"
+import "@k8s/api/core/v1/PodSpec.pkl"
+import "@k8s/api/core/v1/Secret.pkl"
+import "@k8s/api/core/v1/Volume.pkl"
+import "@k8s/K8sObject.pkl"
+import "@k8s/K8sResource.pkl"
+
+configMaps: Mapping<K8sObject.Rfc1035Label, ConfigMap> = resourceMapping(ConfigMap)
+
+secrets: Mapping<K8sObject.Rfc1035Label, Secret> = resourceMapping(Secret)
+
+persistentVolumeClaims: Mapping<K8sObject.Rfc1035Label, PersistentVolumeClaim> =
+  resourceMapping(PersistentVolumeClaim)
+
+hidden initContainers: Mapping<K8sObject.Rfc1035Label, PodSpec.Container> =
+  nameMapping(PodSpec.Container)
+
+hidden containers: Mapping<K8sObject.Rfc1035Label, PodSpec.Container> =
+  nameMapping(PodSpec.Container)
+
+hidden volumes: Mapping<K8sObject.Rfc1035Label, Volume> = nameMapping(Volume)
+
+hidden podName: K8sObject.Rfc1035Label?
+
+hidden podHostName: K8sObject.Rfc1035Label?
+
+function nameMapping(type): Mapping<String, unknown> = new Mapping {
+  default = (key) -> (type) { name = key }
+}
+
+function resourceMapping(type): Mapping<String, unknown> = new Mapping {
+  default = (key) -> (type) { metadata { name = key } }
+}
+
+function merge(modules: Mapping<String, module>): Dynamic =
+  let (excludes = Regex("output|podName|podHostName|deployment"))
+  let (
+    props =
+      reflect.Module(module).moduleClass.properties.filter((key, _) -> !key.matches(excludes))
+  )
+  let (
+    merged =
+      props.map((key, value) ->
+        Pair(
+          key,
+          modules.fold(
+            new Mapping {},
+            (acc: Mapping, k, v: Module) -> (acc) { ...v.getProperty(key) },
+          ),
+        )
+      )
+  )
+    merged.toDynamic()
+    
+
+deployment: Mapping<K8sObject.Rfc1035Label, Deployment> = new {
+  when (podName != null && podHostName != null) {
+    [podName] {
+      metadata {
+        name = podName
+      }
+      spec {
+        replicas = 1
+        strategy {
+          type = "Recreate"
+        }
+        selector {
+          matchLabels {
+            ["app"] = podName
+          }
+        }
+        template {
+          metadata {
+            labels {
+              ["app"] = podName
+            }
+            annotations {
+              ["io.podman.annotations.infra.name"] = "\(podName)-infra"
+            }
+          }
+          spec {
+            when (podHostName != null) {
+              hostname = podHostName
+            }
+            initContainers = module.initContainers.toMap().values.toListing()
+            containers = module.containers.toMap().values.toListing()
+            volumes = module.volumes.toMap().values.toListing()
+          }
+        }
+      }
+    }
+  }
+}
+
+output {
+  renderer = new YamlRenderer {
+    isStream = true
+    converters = (K8sObject.output.renderer as YamlRenderer).converters
+  }
+  value = module.toMap().values.flatMap((item) -> item.toMap().values)
+}

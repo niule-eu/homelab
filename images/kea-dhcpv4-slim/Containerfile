@@ -1,7 +1,7 @@
 ARG KEA_DHCPV4_TAG=3.1.5
 ARG KEA_HOOKS_TAG=3.1.5
 
-FROM docker.io/jonasal/kea-hooks:$KEA_HOOKS_TAG as hooks
+FROM docker.io/jonasal/kea-hooks:$KEA_HOOKS_TAG AS hooks
 
 FROM docker.io/jonasal/kea-dhcp4-slim:$KEA_DHCPV4_TAG
 

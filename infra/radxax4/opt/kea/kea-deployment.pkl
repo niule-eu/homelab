@@ -1,0 +1,57 @@
+amends "@dhcp/main.pkl"
+
+podName = "kea"
+podHostName = "kea"
+
+inputs {
+  tftp {
+    interface = "VLAN13"
+  }
+  kea {
+    dhcp4_interfaces {
+      "VLAN13"
+    }
+    dhcp4_dns_servers {
+      "172.16.13.2"
+    }
+    dhcp4_ddns_ip = "10.255.255.1"
+    dhcp4_ddns_port = 53001
+    postgres_database = "kea"
+    postgres_user = "kea"
+    postgres_password = read("sops:/KEA_DB_PASSWORD").text
+    postgres_host = "10.255.255.9"
+    matchbox_integration_tftp_ip = "172.16.13.3"
+    matchbox_integration_url = "http://matchbox.infra.ams23.niule.xyz"
+    subnets {
+      new {
+        id = 13
+        `ddns-qualifying-suffix` = "infra.ams23.niule.xyz"
+        interface = "VLAN13"
+        subnet = "172.16.13.0/24"
+        enable_matchbox_integration = true
+        reservations {
+          new {
+            `hw-address` = "44:b7:d0:e3:24:50"
+            `ip-address` = "172.16.13.51"
+            hostname = "jetkvm-dc"
+          }
+          new {
+            `hw-address` = "44:b7:d0:e6:59:48"
+            `ip-address` = "172.16.13.52"
+            hostname = "jetkvm-atx"
+          }
+          new {
+            `hw-address` = "10:02:b5:86:1a:1f"
+            `ip-address` = "172.16.13.14"
+            hostname = "radxax4"
+          }
+          new {
+            `hw-address` = "62:68:1d:91:bf:c4"
+            `ip-address` = "172.16.13.41"
+            hostname = "k0s-controller"
+          }
+        }
+      }
+    }
+  }
+}

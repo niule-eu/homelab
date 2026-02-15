@@ -17,10 +17,15 @@
     },
     "package://pkg.pkl-lang.org/github.com/niule-eu/fcos_butane.v1.6.0/fcos_butane.v1.6.0@0": {
       "type": "remote",
-      "uri": "projectpackage://pkg.pkl-lang.org/github.com/niule-eu/fcos_butane.v1.6.0/fcos_butane.v1.6.0@0.2.3",
+      "uri": "projectpackage://pkg.pkl-lang.org/github.com/niule-eu/fcos_butane.v1.6.0/fcos_butane.v1.6.0@0.2.4",
       "checksums": {
-        "sha256": "1936ccd618aa96793eed5d513f3bd12115cb801682497085682e8e472fb69976"
+        "sha256": "9932320a8f9013b274aa5e225e7851ec1fcc75420e520c13f01a2c41afbba0ab"
       }
+    },
+    "package://example.com/matchbox-deployment@0": {
+      "type": "local",
+      "uri": "projectpackage://example.com/matchbox-deployment@0.1.0",
+      "path": "../deployments/matchbox"
     },
     "package://example.com/dns-deployment@0": {
       "type": "local",

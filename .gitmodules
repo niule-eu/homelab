@@ -1,9 +1,6 @@
 [submodule "hlcli"]
 	path = hlcli
 	url = git@github.com:niule-eu/hlcli.git
-[submodule "api.defined.net"]
-	path = api.defined.net
-	url = git@github.com:niule-eu/api.defined.net.git
 [submodule "fcos_butane.v1.6.0"]
 	path = fcos_butane.v1.6.0
 	url = git@github.com:niule-eu/fcos_butane.v1.6.0.git

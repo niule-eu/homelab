@@ -1,0 +1,30 @@
+pki:
+  ca: /etc/nebula/ca.crt
+  cert: /etc/nebula/host.crt
+  key: /etc/nebula/host.key
+
+listen:
+  host: '[::]'
+  port: 4242
+
+static_host_map:
+
+lighthouse:
+  am_lighthouse: true
+  serve_dns: true
+  dns:
+    host: '[::]'
+    port: 53
+
+firewall:
+  outbound:
+  - port: any
+    proto: any
+    host: any
+  inbound:
+  - port: any
+    proto: icmp
+    host: any
+  - port: 53
+    proto: udp
+    group: any

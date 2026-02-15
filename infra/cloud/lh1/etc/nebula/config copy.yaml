@@ -1,0 +1,29 @@
+pki:
+  ca: /etc/nebula/ca.crt
+  cert: /etc/nebula/host.crt
+  key: /etc/nebula/host.key
+
+static_host_map:
+  '10.11.0.1': ['lh1.niuleh.eu:4242', '188.245.97.81:4242']
+
+
+static_map:
+  network: ip4
+
+lighthouse:
+  hosts:
+  - 10.11.0.1
+
+listen:
+  host: '[::]'
+  port: 0
+
+firewall:
+  outbound:
+  - port: any
+    proto: any
+    host: any
+  inbound:
+  - port: any
+    proto: icmp
+    host: any

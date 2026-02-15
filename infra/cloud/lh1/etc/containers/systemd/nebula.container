@@ -1,0 +1,16 @@
+[Unit]
+Description=Nebula
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+ContainerName=nebula
+Image=docker.io/nebulaoss/nebula
+Network=host
+AddCapability=NET_ADMIN
+PodmanArgs=--privileged
+Volume=/etc/nebula:/etc/nebula:Z
+Exec=-config /etc/nebula/config.yaml
+
+[Install]
+WantedBy=multi-user.target

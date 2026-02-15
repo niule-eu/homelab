@@ -1,0 +1,147 @@
+amends "../../fcos_butane_1.6.0/ButaneFcos.pkl"
+
+storage {
+  files {
+    new {
+      path = "/etc/hostname"
+      mode {
+        value = "0o0644"
+      } 
+      overwrite = true
+      contents {
+        inline = read("etc/hostname").text
+      }
+    }
+    // Disable systemd-resolved
+    new {
+      path = "/etc/systemd/resolved.conf.d/disable-stub.conf"
+      mode {
+        value = "0o0644"
+      }
+      contents {
+        inline = read("etc/systemd/resolved.conf.d/disable-stub.conf").text
+      }
+    }
+    new {
+      path = "/etc/containers/containers.conf"
+      mode {
+        value = "0o0644"
+      }
+      contents {
+        inline = read("etc/containers/containers.conf").text
+      }
+    }
+    new {
+      path = "/etc/nebula/ca.crt"
+      mode {
+        value = "0o0644"
+      }
+      contents {
+        inline = read("etc/nebula/ca.crt").text
+      }
+    }
+    // lh1.neb.niuleh.eu.crt
+    new {
+      path = "/etc/nebula/host.crt"
+      mode {
+        value = "0o0644"
+      }
+      contents {
+        inline = read("etc/nebula/host.crt").text
+      }
+    }
+    // lh1.neb.niuleh.eu.key
+    new {
+      path = "/etc/nebula/host.key"
+      mode {
+        value = "0o0644"
+      }
+      contents {
+        inline = read("sops:/lh1/nebula/host_key").text
+      }
+    }
+    new {
+      path = "/etc/nebula/config.yaml"
+      mode {
+        value = "0o0644"
+      }
+      contents {
+        inline = read("etc/nebula/config.yaml").text
+      }
+    }
+    new {
+      path = "/etc/containers/systemd/nebula.container"
+      mode {
+        value = "0o0644"
+      }
+      contents {
+        inline = read("etc/containers/systemd/nebula.container").text
+      }
+    }
+    new {
+      path = "/etc/ssh/ssh_host_rsa_key"
+      mode {
+        value = "0o0600"
+      }
+      contents {
+        inline = read("sops:/lh1/ssh/rsa_key").text
+      }
+      overwrite = true
+    }
+    new {
+      path = "/etc/ssh/ssh_host_rsa_key.pub"
+      overwrite = true
+      contents {
+        inline = read("etc/ssh/ssh_host_rsa_key.pub").text
+      }
+    }
+    new {
+      path = "/etc/ssh/ssh_host_ed25519_key"
+      mode {
+        value = "0o0600"
+      }
+      contents {
+        inline = read("sops:/lh1/ssh/ed25519_key").text
+      }
+      overwrite = true
+    }
+    new {
+      path = "/etc/ssh/ssh_host_ed25519_key.pub"
+      overwrite = true
+      contents {
+        inline = read("etc/ssh/ssh_host_ed25519_key.pub").text
+      }
+    }
+    new {
+      path = "/etc/ssh/ssh_host_ecdsa_key"
+      mode {
+        value = "0o0600"
+      }
+      contents {
+        inline = read("sops:/lh1/ssh/ecdsa_key").text
+      }
+      overwrite = true
+    }
+    new {
+      path = "/etc/ssh/ssh_host_ecdsa_key.pub"
+      overwrite = true
+      contents {
+        inline = read("etc/ssh/ssh_host_ecdsa_key.pub").text
+      }
+    }
+  }
+}
+passwd {
+  users {
+    new {
+      name = "niule"
+      groups {
+        "sudo"
+        "wheel"
+      }
+      ssh_authorized_keys {
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC9AaghNePDNxI//W6OX6Yp6gssMpDUzK+4XoUiXnRZE fedora-sway-atomic@niuleh.eu"
+      }
+    }
+  }
+}

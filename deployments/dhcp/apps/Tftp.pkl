@@ -1,0 +1,80 @@
+extends "../Template.pkl"
+
+import "@net/net.pkl"
+
+class Inputs {
+  listen_address: net.IPv4AddressString?
+  interface: String?
+}
+
+hidden inputs: Inputs = new {}
+
+configMaps {
+  ["dnsmasq"] {
+    data {
+      ["dnsmasq.conf"] =
+        let (
+          la =
+            if (inputs.listen_address != null)
+              """
+              listen-address=\(inputs.listen_address)
+              bind-interfaces
+
+              """
+            else
+              ""
+        )
+        let (
+          i =
+            if (inputs.interface != null)
+              """
+              interface=\(inputs.interface)
+              bind-interfaces
+
+              """
+            else
+              ""
+        )
+          la
+            + i
+            + """
+            port=0
+            enable-tftp
+            tftp-port-range=49900,49919
+            tftp-root=/var/lib/tftpboot
+            keep-in-foreground
+            log-facility=-
+            """
+    }
+  }
+}
+
+volumes {
+  ["dnsmasq"] {
+    configMap {
+      name = "dnsmasq"
+    }
+  }
+}
+
+containers {
+  ["dnsmasq"] {
+    image = "quay.io/poseidon/dnsmasq:v0.5.0-46-g6abd73c"
+    args {
+      "--conf-file=/etc/dnsmasq/dnsmasq.conf"
+    }
+    securityContext {
+      capabilities {
+        add {
+          "CAP_NET_ADMIN"
+        }
+      }
+    }
+    volumeMounts {
+      new {
+        name = "dnsmasq"
+        mountPath = "/etc/dnsmasq"
+      }
+    }
+  }
+}

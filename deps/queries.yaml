@@ -28,3 +28,11 @@
   owner: fluxcd
   pattern: '^flux.*linux_amd64\.tar\.gz$'
   checksums_pattern: '^flux.*checksums.txt$'
+- repo: k0sctl
+  owner: k0sproject
+  pattern: '.*linux-amd64$'
+  checksums_pattern: '^checksums.txt$'
+- repo: uv
+  owner: astral-sh
+  pattern: '.*x86_64-unknown-linux-gnu.tar.gz$'
+  checksums_pattern: '.*x86_64-unknown-linux-gnu.tar.gz.sha256$'

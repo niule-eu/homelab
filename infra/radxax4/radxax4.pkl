@@ -149,66 +149,22 @@ storage {
             .text
       }
     }
+    ["/opt/matchbox/matchbox-deployment.yaml"] {
+      path = "/opt/matchbox/matchbox-deployment.yaml"
+      mode {
+        value = "0o600"
+      }
+      contents {
+        inline = import("opt/matchbox/matchbox-deployment.pkl").output.text
+      }
+    }
     ["/opt/kea/kea-deployment.yaml"] {
       path = "/opt/kea/kea-deployment.yaml"
       mode {
         value = "0o600"
       }
       contents {
-        inline =
-          (
-            (dhcp_manifest) {
-              podName = "kea"
-              inputs = new dhcp_manifest.DhcpInputs {
-                kea {
-                  dhcp4_interfaces {
-                    "VLAN13"
-                  }
-                  dhcp4_dns_servers {
-                    "172.16.13.2"
-                  }
-                  dhcp4_ddns_ip = "10.255.255.1"
-                  dhcp4_ddns_port = 53001
-                  postgres_database = "kea"
-                  postgres_user = "kea"
-                  postgres_password = read("sops:/KEA_DB_PASSWORD").text
-                  postgres_host = "10.255.255.9"
-                  subnets {
-                    new {
-                      id = 13
-                      `ddns-qualifying-suffix` = "infra.ams23.niule.xyz"
-                      interface = "VLAN13"
-                      subnet = "172.16.13.0/24"
-                      reservations {
-                        new {
-                          `hw-address` = "44:b7:d0:e3:24:50"
-                          `ip-address` = "172.16.13.51"
-                          hostname = "jetkvm-dc"
-                        }
-                        new {
-                          `hw-address` = "44:b7:d0:e6:59:48"
-                          `ip-address` = "172.16.13.52"
-                          hostname = "jetkvm-atx"
-                        }
-                        new {
-                          `hw-address` = "10:02:b5:86:1a:1f"
-                          `ip-address` = "172.16.13.14"
-                          hostname = "radxax4"
-                        }
-                        new {
-                          `hw-address` = "62:68:1d:91:bf:c4"
-                          `ip-address` = "172.16.13.41"
-                          hostname = "k0s-controller"
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          )
-            .output
-            .text
+        inline = import("opt/kea/kea-deployment.pkl").output.text
       }
     }
     ["/opt/kea/\(dhcp_manifest.containers["kea-dhcp4"].image)/Containerfile"] {
@@ -263,7 +219,6 @@ storage {
       }
     }
     ["/opt/envoy/envoy-deployment.yaml"] {
-      path = "/opt/envoy/envoy-deployment.yaml"
       mode {
         value = "0o600"
       }
@@ -287,6 +242,8 @@ storage {
                               host_pdns_apt_bind_port = 443
                               host_pdns_api_target_ip = "10.255.255.1"
                               host_pdns_apt_target_port = 8081
+                              host_matchbox_target_ip = "10.255.255.1"
+                              host_matchbox_target_port = 8080
                               dot_certificate_chain_path =
                                 "/etc/envoy/secrets/dns.infra.ams23.niule.xyz.crt"
                               dot_private_key_path =
@@ -295,6 +252,10 @@ storage {
                                 "/etc/envoy/secrets/pdnsapi.infra.ams23.niule.xyz.crt"
                               pdnsapi_private_key_path =
                                 "/etc/envoy/secrets/pdnsapi.infra.ams23.niule.xyz.key"
+                              matchbox_certificate_chain_path = 
+                                "/etc/envoy/secrets/matchbox.infra.ams23.niule.xyz.crt"
+                              matchbox_private_key_path =
+                                "/etc/envoy/secrets/matchbox.infra.ams23.niule.xyz.key"
                             }
                           )
                             .output
@@ -323,6 +284,14 @@ storage {
                         ["pdnsapi.infra.ams23.niule.xyz.key"] =
                           read(
                             "sopstar:\(module_dir)../certs/dot.lego.tar#certificates/pdnsapi.infra.ams23.niule.xyz.key"
+                          ).text
+                        ["matchbox.infra.ams23.niule.xyz.crt"] =
+                          read(
+                            "sopstar:\(module_dir)../certs/dot.lego.tar#certificates/matchbox.infra.ams23.niule.xyz.crt"
+                          ).text
+                        ["matchbox.infra.ams23.niule.xyz.key"] =
+                          read(
+                            "sopstar:\(module_dir)../certs/dot.lego.tar#certificates/matchbox.infra.ams23.niule.xyz.key"
                           ).text
                       }
                     }

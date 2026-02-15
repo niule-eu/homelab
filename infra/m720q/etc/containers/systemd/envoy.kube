@@ -1,13 +1,11 @@
 [Unit]
 Requires=envoy-bridge-network.service envoy-macvlan-network.service
+After=envoy-bridge-network.service envoy-macvlan-network.service
 
 [Kube]
 Yaml=/opt/envoy/envoy-deployment.yaml
 Network=systemd-envoy-macvlan:ip=172.16.13.2,mac=92:88:3c:65:21:bd
 Network=systemd-envoy-bridge:ip=10.255.255.2
-
-[Service]
-ExecStartPost=/usr/bin/bash -c 'sleep 2 && nsenter -t `podman inspect --format "{{.State.Pid}}" envoy-pod-envoy` -n ip r del default via 10.255.255.1'
 
 [Install]
 WantedBy=multi-user.target default.target

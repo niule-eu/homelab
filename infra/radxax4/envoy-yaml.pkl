@@ -1,26 +1,31 @@
-hidden host_dns_bind_ip : String = "172.16.13.2"
-hidden host_dns_bind_port : Int = 53
-hidden host_dns_target_ip : String = "127.0.0.1"
-hidden host_dns_target_port : Int = 5301
-hidden host_pdns_api_bind_ip : String
-hidden host_pdns_apt_bind_port : Int
-hidden host_pdns_api_target_ip : String
-hidden host_pdns_apt_target_port : Int
+hidden host_dns_bind_ip: String = "172.16.13.2"
+hidden host_dns_bind_port: Int = 53
+hidden host_dns_target_ip: String = "127.0.0.1"
+hidden host_dns_target_port: Int = 5301
+hidden host_pdns_api_bind_ip: String
+hidden host_pdns_apt_bind_port: Int
+hidden host_pdns_api_target_ip: String
+hidden host_pdns_apt_target_port: Int
 
-hidden dot_certificate_chain_path : String?
-hidden dot_private_key_path : String?
-hidden pdnsapi_certificate_chain_path : String?
-hidden pdnsapi_private_key_path : String?
-hidden host_dot_bind_port : Int?
+hidden host_matchbox_target_ip: String
+hidden host_matchbox_target_port: Int
+hidden matchbox_certificate_chain_path: String
+hidden matchbox_private_key_path: String
+
+hidden dot_certificate_chain_path: String?
+hidden dot_private_key_path: String?
+hidden pdnsapi_certificate_chain_path: String?
+hidden pdnsapi_private_key_path: String?
+hidden host_dot_bind_port: Int?
 
 abstract class Address {
-  function address() : Any = throw("Abstract method")
+  function address(): Any = throw("Abstract method")
 }
 
 class SocketAddress extends Address {
-  hidden ip : String
-  hidden port : Int
-  hidden protocol : "TCP" | "UDP" = "TCP"
+  hidden ip: String
+  hidden port: Int
+  hidden protocol: "TCP" | "UDP" = "TCP"
 
   local proto = protocol
   local address {
@@ -31,23 +36,23 @@ class SocketAddress extends Address {
     }
   }
 
-  function address() : Any = address
+  function address(): Any = address
 }
 
 class DnsListener {
-  hidden listener_address : Address
-  
-  name : String
+  hidden listener_address: Address
+
+  name: String
   address = listener_address.address()
-  udp_listener_config : Any?
-  listener_filters : Listing<Any>
-  filter_chains : Listing<Any>
+  udp_listener_config: Any?
+  listener_filters: Listing<Any>
+  filter_chains: Listing<Any>
 }
 
 class SimpleCluster {
-  hidden endpoint_address : Address
-  
-  name : String
+  hidden endpoint_address: Address
+
+  name: String
   type = "STATIC"
   load_assignment {
     cluster_name = name
@@ -63,18 +68,57 @@ class SimpleCluster {
   }
 }
 
+class SimpleHttpFilterChain {
+  hidden cluster_name: String
+
+  local _vhosts = new Listing {
+    new {
+      name = "http_vhost"
+      domains = new Listing {"*"}
+      routes = new Listing {
+        new {
+          match { prefix = "/" }
+          route { cluster = cluster_name }
+        }
+      }
+    }
+  }
+
+  name: String
+  filters = new Listing {
+    new {
+      name = "envoy.filters.network.http_connection_manager"
+      typed_config {
+        `@type` =
+          "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"
+        stat_prefix = "ingress_https"
+        route_config {
+          virtual_hosts = _vhosts
+        }
+        http_filters = new Listing {
+          new {
+            name = "http_router"
+            typed_config {
+              `@type` = "type.googleapis.com/envoy.extensions.filters.http.router.v3.Router"
+            }
+          }
+        }
+      }
+    }
+  }
+}
 
 class SimpleHttpsFilterChain {
-  hidden cluster_domains_mappings : Mapping<String, Listing<String>>
-  hidden vhosts : Listing<Any> = new Listing {}
-  hidden certificate_chain_file_path : String
-  hidden certificate_private_key_file_path : String
-  
+  hidden cluster_domains_mappings: Mapping<String, Listing<String>>
+  hidden vhosts: Listing<Any> = new Listing {}
+  hidden certificate_chain_file_path: String
+  hidden certificate_private_key_file_path: String
+
   local _server_names = cluster_domains_mappings.toMap().values.flatten().toListing()
 
-  local _vhosts = 
-    cluster_domains_mappings
-      .fold(vhosts, (acc : Listing<Any>, k, v) -> (
+  local _vhosts =
+    cluster_domains_mappings.fold(vhosts, (acc: Listing<Any>, k, v) ->
+      (
         new Listing {
           ...acc
           new {
@@ -82,15 +126,16 @@ class SimpleHttpsFilterChain {
             domains = v
             routes = new Listing {
               new {
-                match { prefix = "/"}
+                match { prefix = "/" }
                 route { cluster = k }
               }
             }
           }
         }
-      ))
+      )
+    )
 
-  name : String
+  name: String
   filter_chain_match {
     server_names = _server_names
   }
@@ -98,7 +143,8 @@ class SimpleHttpsFilterChain {
     new {
       name = "envoy.filters.network.http_connection_manager"
       typed_config {
-        `@type` = "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"
+        `@type` =
+          "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"
         stat_prefix = "ingress_https"
         route_config {
           virtual_hosts = _vhosts
@@ -115,9 +161,9 @@ class SimpleHttpsFilterChain {
     }
   }
   transport_socket {
-    name= "envoy.transport_sockets.tls"
+    name = "envoy.transport_sockets.tls"
     typed_config {
-      `@type`= "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext"
+      `@type` = "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext"
       common_tls_context {
         tls_certificates = new Listing {
           new {
@@ -126,25 +172,35 @@ class SimpleHttpsFilterChain {
           }
         }
         validation_context {
-          trusted_ca { filename = "/etc/ssl/certs/ca-certificates.crt"}
+          trusted_ca { filename = "/etc/ssl/certs/ca-certificates.crt" }
         }
       }
     }
   }
 }
 
+class SimpleHttpListener {
+  hidden listener_address: Address
+  hidden simple_filter_chains: Listing<SimpleHttpFilterChain>
+
+  name: String
+  address = listener_address.address()
+  filter_chains = simple_filter_chains
+}
+
 class SimpleHttpsListener {
-  hidden listener_address : Address
-  hidden simple_filter_chains : Listing<SimpleHttpsFilterChain>
-  
-  name : String 
+  hidden listener_address: Address
+  hidden simple_filter_chains: Listing<SimpleHttpsFilterChain>
+
+  name: String
   address = listener_address.address()
   filter_chains = simple_filter_chains
   listener_filters = new Listing {
     new {
       name = "tls_inspector"
       typed_config {
-        `@type` = "type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector"
+        `@type` =
+          "type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector"
       }
     }
   }
@@ -173,10 +229,71 @@ local _clusters = new Mapping<String, Any> {
       port = host_pdns_apt_target_port
     }
   }
+  ["matchbox_cluster"] = new SimpleCluster {
+    name = "matchbox"
+    endpoint_address = new SocketAddress {
+      ip = host_matchbox_target_ip
+      port = host_matchbox_target_port
+    }
+  }
 }
 
 local _listeners = new Mapping<String, Any> {
-  when (dot_certificate_chain_path != null && dot_private_key_path != null && host_dot_bind_port != null) {
+  ["http_listener"] = new SimpleHttpListener {
+  name = "http_listener"
+  listener_address = new SocketAddress {
+    ip = host_pdns_api_bind_ip
+    port = 80
+  }
+  simple_filter_chains {
+    new {
+      name = "matchbox"
+      cluster_name = (_clusters["matchbox_cluster"] as SimpleCluster).name
+    }
+  }
+}
+  ["https_listener"] = new SimpleHttpsListener {
+    name = "https_listener"
+    listener_address = new SocketAddress {
+      ip = host_pdns_api_bind_ip
+      port = host_pdns_apt_bind_port
+    }
+    simple_filter_chains {
+      new {
+        name = "pdns_api"
+        certificate_chain_file_path = pdnsapi_certificate_chain_path!!
+        certificate_private_key_file_path = pdnsapi_private_key_path!!
+        cluster_domains_mappings {
+          [(_clusters["powerdns_api_cluster"] as SimpleCluster).name] {
+            "pdnsapi.infra.ams23.niule.xyz"
+          }
+        }
+      }
+      new {
+        name = "dns_over_https"
+        certificate_chain_file_path = dot_certificate_chain_path!!
+        certificate_private_key_file_path = dot_private_key_path!!
+        cluster_domains_mappings {
+          [(_clusters["dns_tcp_cluster"] as SimpleCluster).name] {
+            "dns.infra.ams23.niule.xyz"
+          }
+        }
+      }
+      new {
+        name = "matchbox"
+        certificate_chain_file_path = matchbox_certificate_chain_path!!
+        certificate_private_key_file_path = matchbox_private_key_path!!
+        cluster_domains_mappings {
+          [(_clusters["matchbox_cluster"] as SimpleCluster).name] {
+            "matchbox.infra.ams23.niule.xyz"
+          }
+        }
+      }
+    }
+  }
+  when (
+    dot_certificate_chain_path != null && dot_private_key_path != null && host_dot_bind_port != null
+  ) {
     ["dns_dot_listener"] = new DnsListener {
       name = "dns_dot_listener"
       listener_address = new SocketAddress {
@@ -190,16 +307,18 @@ local _listeners = new Mapping<String, Any> {
             new {
               name = "envoy.filters.network.tcp_proxy"
               typed_config {
-                `@type` = "type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy"
+                `@type` =
+                  "type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy"
                 stat_prefix = "tcp_proxy"
                 cluster = (_clusters["dns_tcp_cluster"] as SimpleCluster).name
               }
             }
           }
           transport_socket {
-            name= "envoy.transport_sockets.tls"
+            name = "envoy.transport_sockets.tls"
             typed_config {
-              `@type`= "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext"
+              `@type` =
+                "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext"
               common_tls_context {
                 tls_certificates = new Listing {
                   new {
@@ -208,13 +327,13 @@ local _listeners = new Mapping<String, Any> {
                   }
                 }
                 validation_context {
-                  trusted_ca { filename = "/etc/ssl/certs/ca-certificates.crt"}
+                  trusted_ca { filename = "/etc/ssl/certs/ca-certificates.crt" }
                 }
               }
             }
           }
         }
-      } 
+      }
     }
   }
   ["dns_tcp_listener"] = new DnsListener {
@@ -223,7 +342,6 @@ local _listeners = new Mapping<String, Any> {
       ip = host_dns_bind_ip
       protocol = "TCP"
       port = host_dns_bind_port
-      
     }
     filter_chains = new Listing {
       new {
@@ -238,7 +356,7 @@ local _listeners = new Mapping<String, Any> {
           }
         }
       }
-    } 
+    }
   }
   ["dns_udp_listener"] = new DnsListener {
     name = "dns_udp_listener"
@@ -276,35 +394,6 @@ local _listeners = new Mapping<String, Any> {
       }
     }
   }
-  ["https_listener"] = new SimpleHttpsListener {
-    name = "https_listener"
-    listener_address = new SocketAddress {
-      ip = host_pdns_api_bind_ip
-      port = host_pdns_apt_bind_port
-    }
-    simple_filter_chains {
-      new {
-        name = "pdns_api"
-        certificate_chain_file_path = pdnsapi_certificate_chain_path!!
-        certificate_private_key_file_path = pdnsapi_private_key_path!!
-        cluster_domains_mappings {
-          [(_clusters["powerdns_api_cluster"] as SimpleCluster).name] { 
-            "pdnsapi.infra.ams23.niule.xyz" 
-          }
-        }
-      }
-      new {
-        name = "dns_over_https"
-        certificate_chain_file_path = dot_certificate_chain_path!!
-        certificate_private_key_file_path = dot_private_key_path!!
-        cluster_domains_mappings {
-          [(_clusters["dns_tcp_cluster"] as SimpleCluster).name] {
-            "dns.infra.ams23.niule.xyz"
-          }
-        }
-      }
-    }
-  }
 }
 
 static_resources {
@@ -313,11 +402,13 @@ static_resources {
     _listeners["dns_tcp_listener"]
     _listeners["dns_udp_listener"]
     _listeners["https_listener"]
+    _listeners["http_listener"]
   }
   clusters = new Listing {
     _clusters["dns_tcp_cluster"]
     _clusters["dns_udp_cluster"]
     _clusters["powerdns_api_cluster"]
+    _clusters["matchbox_cluster"]
   }
 }
 

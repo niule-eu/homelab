@@ -80,6 +80,24 @@ files: Mapping<String, Storage.File> = (fileMapping(Storage.File)) {
         """
     }
   }
+  ["/etc/containers/systemd/matchbox.kube"] {
+    contents {
+      inline =
+        """
+        [Unit]
+        Requires=envoy-bridge-network.service
+        After=envoy-bridge-network.service
+
+        [Kube]
+        Yaml=/opt/matchbox/matchbox-deployment.yaml
+        Network=systemd-envoy-bridge:interface_name=envoy-bridge
+
+        [Install]
+        WantedBy=multi-user.target default.target
+
+        """
+    }
+  }
   ["/etc/containers/systemd/dns-bridge.network"] {
     contents {
       inline =

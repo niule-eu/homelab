@@ -25,22 +25,22 @@
     "package://example.com/matchbox-deployment@0": {
       "type": "local",
       "uri": "projectpackage://example.com/matchbox-deployment@0.1.0",
-      "path": "../deployments/matchbox"
+      "path": "../../deployments/matchbox"
     },
     "package://example.com/dns-deployment@0": {
       "type": "local",
       "uri": "projectpackage://example.com/dns-deployment@0.1.0",
-      "path": "../deployments/dns"
+      "path": "../../deployments/dns"
     },
     "package://example.com/dhcp-deployment@0": {
       "type": "local",
       "uri": "projectpackage://example.com/dhcp-deployment@0.1.0",
-      "path": "../deployments/dhcp"
+      "path": "../../deployments/dhcp"
     },
     "package://example.com/postgres-deployment@0": {
       "type": "local",
       "uri": "projectpackage://example.com/postgres-deployment@0.1.0",
-      "path": "../deployments/postgres"
+      "path": "../../deployments/postgres"
     }
   }
 }

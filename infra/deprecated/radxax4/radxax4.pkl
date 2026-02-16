@@ -225,11 +225,11 @@ storage {
       contents {
         inline =
           (
-            (import("../../deployments/envoy/deployment.pkl")) {
+            (import("../../../deployments/envoy/deployment.pkl")) {
               envoy_configs =
                 (
                   (
-                    (import("../../deployments/envoy/configmaps/envoy-configs.pkl")) {
+                    (import("../../../deployments/envoy/configmaps/envoy-configs.pkl")) {
                       envoy_configs {
                         ["envoy.yaml"] =
                           (
@@ -267,31 +267,31 @@ storage {
               envoy_secrets =
                 (
                   (
-                    (import("../../deployments/envoy/configmaps/envoy-secrets.pkl")) {
+                    (import("../../../deployments/envoy/configmaps/envoy-secrets.pkl")) {
                       envoy_secrets {
                         ["dns.infra.ams23.niule.xyz.crt"] =
                           read(
-                            "sopstar:\(module_dir)../certs/dot.lego.tar#certificates/dns.infra.ams23.niule.xyz.crt"
+                            "sopstar:\(module_dir)../../certs/dot.lego.tar#certificates/dns.infra.ams23.niule.xyz.crt"
                           ).text
                         ["dns.infra.ams23.niule.xyz.key"] =
                           read(
-                            "sopstar:\(module_dir)../certs/dot.lego.tar#certificates/dns.infra.ams23.niule.xyz.key"
+                            "sopstar:\(module_dir)../../certs/dot.lego.tar#certificates/dns.infra.ams23.niule.xyz.key"
                           ).text
                         ["pdnsapi.infra.ams23.niule.xyz.crt"] =
                           read(
-                            "sopstar:\(module_dir)../certs/dot.lego.tar#certificates/pdnsapi.infra.ams23.niule.xyz.crt"
+                            "sopstar:\(module_dir)../../certs/dot.lego.tar#certificates/pdnsapi.infra.ams23.niule.xyz.crt"
                           ).text
                         ["pdnsapi.infra.ams23.niule.xyz.key"] =
                           read(
-                            "sopstar:\(module_dir)../certs/dot.lego.tar#certificates/pdnsapi.infra.ams23.niule.xyz.key"
+                            "sopstar:\(module_dir)../../certs/dot.lego.tar#certificates/pdnsapi.infra.ams23.niule.xyz.key"
                           ).text
                         ["matchbox.infra.ams23.niule.xyz.crt"] =
                           read(
-                            "sopstar:\(module_dir)../certs/dot.lego.tar#certificates/matchbox.infra.ams23.niule.xyz.crt"
+                            "sopstar:\(module_dir)../../certs/dot.lego.tar#certificates/matchbox.infra.ams23.niule.xyz.crt"
                           ).text
                         ["matchbox.infra.ams23.niule.xyz.key"] =
                           read(
-                            "sopstar:\(module_dir)../certs/dot.lego.tar#certificates/matchbox.infra.ams23.niule.xyz.key"
+                            "sopstar:\(module_dir)../../certs/dot.lego.tar#certificates/matchbox.infra.ams23.niule.xyz.key"
                           ).text
                       }
                     }

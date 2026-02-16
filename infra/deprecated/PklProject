@@ -10,10 +10,10 @@ amends "pkl:Project"
 // New node configurations should follow the patterns established in the infra/nodes/ directory.
 
 dependencies {
-  ["dhcp"] = import("../deployments/dhcp/PklProject")
-  ["matchbox"] = import("../deployments/matchbox/PklProject")
-  ["dns"] = import("../deployments/dns/PklProject")
-  ["postgres"] = import("../deployments/postgres/PklProject")
+  ["dhcp"] = import("../../deployments/dhcp/PklProject")
+  ["matchbox"] = import("../../deployments/matchbox/PklProject")
+  ["dns"] = import("../../deployments/dns/PklProject")
+  ["postgres"] = import("../../deployments/postgres/PklProject")
   ["fcos_butane"] {
     uri = "package://pkg.pkl-lang.org/github.com/niule-eu/fcos_butane.v1.6.0/fcos_butane.v1.6.0@0.2.4"
   }

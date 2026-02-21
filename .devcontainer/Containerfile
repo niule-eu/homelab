@@ -117,6 +117,7 @@ ARG USERID
 ARG GROUPID
 ARG USERNAME
 ARG ASTRAL_SH_UV_TAG
+ARG NIULE_EU_HLCLI_TAG
 
 RUN dnf update -y && dnf install -y --setopt=install_weak_deps=False \
     git \
@@ -142,6 +143,7 @@ COPY --chown=root:root --chmod=0644 --from=sd /tmp/completions/sd.bash /usr/shar
 COPY --chown=root:root --chmod=0755 --from=kubectl_1_34_2 /bin/kubectl /usr/local/bin/
 COPY --chown=root:root --chmod=0755 --from=flux /tmp/flux /usr/local/bin
 COPY --from=ghcr.io/astral-sh/uv:$ASTRAL_SH_UV_TAG /uv /uvx /bin/
+COPY --from=ghcr.io/niule-eu/hlcli:$NIULE_EU_HLCLI_TAG /ko-app/hlcli /usr/local/bin
 
 # create container user
 RUN <<EOF /bin/bash
@@ -158,7 +160,6 @@ RUN <<"EOF" /bin/bash -s ${USERNAME}
     chown -R $USERNAME:$USERNAME /home/$USERNAME/.config/
 EOF
 
-
 # persist container user command history
 RUN <<EOF /bin/bash
     set -eux
@@ -170,15 +171,24 @@ EOF
 
 USER $USERNAME
 
+# Setup vibe cli
+RUN <<"EOF" /bin/bash
+    set -eux
+    uv tool install mistral-vibe
+EOF
+
 ENV PATH="$PATH:/opt/java/openjdk/bin"
 
 COPY --chown=$USERNAME:$USERNAME podman-connections.json /home/$USERNAME/.config/containers/podman-connections.json
 
-COPY --chown=$USERNAME:$USERNAME <<podman-alias <<"gopath-bin" <<"dnscontrol-completion" /home/$USERNAME/.bashrc.d/
+COPY --chown=$USERNAME:$USERNAME <<podman-alias <<"podman-completion" <<"gopath-bin" <<"dnscontrol-completion" <<"vibe" /home/$USERNAME/.bashrc.d/
     alias podman='podman-remote'
 podman-alias
+    eval "$(podman completion bash)"
+podman-completion
     export PATH=$PATH:$GOPATH/bin
 gopath-bin
     eval "$(dnscontrol shell-completion bash)"
 dnscontrol-completion
-
+    alias vibe='MISTRAL_API_KEY=$(sops decrypt --extract "[\"MISTRAL_API_KEY\"]" secrets.yaml) vibe'
+vibe

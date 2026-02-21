@@ -19,6 +19,7 @@
         "--volume", "${localEnv:HOME}/.ssh:/home/${localEnv:USER}/.ssh:Z",
         "--volume", "${localEnv:HOME}/.config/sops/age:/home/${localEnv:USER}/.config/sops/age:Z",
         "--volume", "${devcontainerId}-bashhistory:/commandhistory:Z,U",
+        "--volume", "${devcontainerId}-vibe:/home/${localEnv:USER}/.vibe:Z,U",
         "--volume", "/run/user/1000/podman/podman.sock:/run/user/2000/podman/podman.sock:z",
         "--userns", "keep-id:uid=2000,gid=2000",
         "--hostname", "${localWorkspaceFolderBasename}-dc",

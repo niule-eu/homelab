@@ -36,3 +36,7 @@
   owner: astral-sh
   pattern: '.*x86_64-unknown-linux-gnu.tar.gz$'
   checksums_pattern: '.*x86_64-unknown-linux-gnu.tar.gz.sha256$'
+- repo: hlcli
+  owner: niule-eu
+  pattern: 'linux.amd64$'
+  checksums_pattern: 'checksums.txt'

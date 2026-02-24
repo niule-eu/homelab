@@ -40,6 +40,11 @@ jobs:
             else
               version="${{ github.sha }}"
             fi
+            if [ -f "$dir/argfile.conf" ]; then
+              source "$dir/argfile.conf"
+            else
+              ()
+            fi
             docker buildx build --push \
               --file "$containerfile" \
               --tag "${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${image_name}:${version}" \

@@ -42,13 +42,17 @@ jobs:
               version="${{ github.sha }}"
             fi
             if [ -f "$dir/argfile.conf" ]; then
-              source "$dir/argfile.conf"
-            else
               :
+            else
+              touch "$dir/argfile.conf"
             fi
-            docker buildx build --push \
+            buildah build \
               --file "$containerfile" \
+              --build-arg-file "$dir/argfile.conf" \
               --tag "${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${image_name}:${version}" \
               --tag "${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${image_name}:latest" \
               "$dir"
+            buildah push \
+              "${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${image_name}:${version}" \
+              "docker://${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${image_name}:${version}"
           done

@@ -44,7 +44,7 @@ jobs:
             if [ -f "$dir/argfile.conf" ]; then
               source "$dir/argfile.conf"
             else
-              ;
+              :
             fi
             docker buildx build --push \
               --file "$containerfile" \

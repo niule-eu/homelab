@@ -46,13 +46,15 @@ jobs:
             else
               touch "$dir/argfile.conf"
             fi
-            buildah build \
-              --file "$containerfile" \
-              --build-arg-file "$dir/argfile.conf" \
-              --tag "${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${image_name}:${version}" \
-              --tag "${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${image_name}:latest" \
-              "$dir"
-            buildah push \
-              "${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${image_name}:${version}" \
-              "docker://${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${image_name}:${version}"
+            cmd=(
+              'docker buildx build --push'
+              "--file $containerfile"
+              "--tag "${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${image_name}:${version}""
+              "--tag "${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${image_name}:latest""
+            )
+            for ba in $(cat "$dir/argfile.conf"); do
+              cmd+=('--build-arg' "$ba")
+            done
+            cmd+=("$dir")
+            eval "$cmd"
           done

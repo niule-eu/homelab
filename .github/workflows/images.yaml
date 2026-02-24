@@ -56,5 +56,5 @@ jobs:
               cmd+=('--build-arg' "$ba")
             done
             cmd+=("$dir")
-            eval "$cmd"
+            eval "${cmd[@]}"
           done

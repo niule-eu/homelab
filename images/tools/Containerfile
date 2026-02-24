@@ -117,7 +117,7 @@ FROM ghcr.io/astral-sh/uv:$ASTRAL_SH_UV_TAG as astral_uv
 
 FROM ghcr.io/niule-eu/hlcli:$NIULE_EU_HLCLI_TAG as niule_hlcli
 
-FROM fedora-minimal:43
+FROM registry.fedoraproject.org/fedora-minimal:43
 
 ARG USERID
 ARG GROUPID

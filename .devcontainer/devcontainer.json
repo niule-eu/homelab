@@ -4,12 +4,12 @@
         "context": ".",
         "args": {
             "WORKDIR": "/workspaces/${localWorkspaceFolderBasename}",
-            "USERID": "2000",
-            "GROUPID": "2000",
+            "USERID": "2001",
+            "GROUPID": "2001",
             "USERNAME": "${localEnv:USER}"
         },
         "options": [
-            "--build-arg-file=.devcontainer/argfile.conf"
+            // "--build-arg-file=.devcontainer/argfile.conf"
         ]
     },
     "workspaceMount": "",
@@ -20,8 +20,8 @@
         "--volume", "${localEnv:HOME}/.config/sops/age:/home/${localEnv:USER}/.config/sops/age:Z",
         "--volume", "${devcontainerId}-bashhistory:/commandhistory:Z,U",
         "--volume", "${devcontainerId}-vibe:/home/${localEnv:USER}/.vibe:Z,U",
-        "--volume", "/run/user/1000/podman/podman.sock:/run/user/2000/podman/podman.sock:z",
-        "--userns", "keep-id:uid=2000,gid=2000",
+        "--volume", "/run/user/1000/podman/podman.sock:/run/user/2001/podman/podman.sock:z",
+        "--userns", "keep-id:uid=2001,gid=2001",
         "--hostname", "${localWorkspaceFolderBasename}-dc",
         "--security-opt", "label:type:container_runtime_t",
         "--env", "GOPATH=/home/${localEnv:USER}/go",

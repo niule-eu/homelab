@@ -3,7 +3,7 @@
     "Default": "host",
     "Connections": {
       "host": {
-        "URI": "unix://run/user/2000/podman/podman.sock"
+        "URI": "unix://run/user/2001/podman/podman.sock"
       },
       "radxax4": {
         "URI": "ssh://core@172.16.13.14:22/run/user/1000/podman/podman.sock",

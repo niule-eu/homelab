@@ -1,161 +1,16 @@
-ARG KUBECTL_IMAGE_1_34_2
-
-# Download golang and extract to tmp
-FROM curlimages/curl:latest as golang
-
-# For github assets, and generally a good idea:
-# curl -H "Accept: application/octet-stream"
-
-ARG GOLANG_URL
-ARG GOLANG_HASH
-
-RUN <<EOF /bin/sh
-    set -eux
-    curl -H "Accept: application/octet-stream" -Lo go.tar.gz ${GOLANG_URL}
-    echo "${GOLANG_HASH} go.tar.gz" | sha256sum -c
-    tar -C /tmp/ -xzf go.tar.gz
-EOF
-
-# Download sops and move to /tmp
-FROM curlimages/curl:latest as sops
-
-ARG GETSOPS_SOPS_URL
-ARG GETSOPS_SOPS_HASH
-
-RUN <<EOF /bin/sh
-    set -eux
-    curl -H "Accept: application/octet-stream" -Lo sops ${GETSOPS_SOPS_URL}
-    echo "${GETSOPS_SOPS_HASH} sops" | sha256sum -c
-    mv sops /tmp/sops
-EOF
-
-# Download opentofu and move to /tmp
-FROM curlimages/curl:latest as opentofu
-
-ARG OPENTOFU_OPENTOFU_URL
-ARG OPENTOFU_OPENTOFU_HASH
-
-RUN <<EOF /bin/sh
-    set -eux
-    curl -H "Accept: application/octet-stream" -Lo opentofu.tar.gz ${OPENTOFU_OPENTOFU_URL}
-    echo "${OPENTOFU_OPENTOFU_HASH} opentofu.tar.gz" | sha256sum -c
-    tar -C /tmp/ -xzf opentofu.tar.gz
-EOF
-
-# Download podman-remote and move to /tmp
-FROM curlimages/curl:latest as podman-remote
-
-ARG CONTAINERS_PODMAN_URL
-ARG CONTAINERS_PODMAN_HASH
-
-RUN <<EOF /bin/sh
-    set -eux
-    curl -H "Accept: application/octet-stream" -Lo podman-remote.tar.gz ${CONTAINERS_PODMAN_URL}
-    echo "${CONTAINERS_PODMAN_HASH} podman-remote.tar.gz" | sha256sum -c
-    tar -C /tmp/ -xzf podman-remote.tar.gz
-EOF
-
-# Download pkl and move to /tmp
-FROM curlimages/curl:latest as pkl
-
-ARG APPLE_PKL_URL
-
-RUN <<EOF /bin/sh
-    set -eux
-    curl -H "Accept: application/octet-stream" -Lo pkl ${APPLE_PKL_URL}
-    chmod +x pkl
-    mv pkl /tmp/pkl    
-EOF
-
-FROM docker.io/eclipse-temurin:22.0.2_9-jdk-ubi9-minimal as java
-
-# Download dnscontrol and move to /tmp
-FROM curlimages/curl:latest as dnscontrol
-
-ARG STACKEXCHANGE_DNSCONTROL_URL
-ARG STACKEXCHANGE_DNSCONTROL_HASH
-
-RUN <<EOF /bin/sh
-    set -eux
-    curl -H "Accept: application/octet-stream" -Lo dnscontrol.tar.gz ${STACKEXCHANGE_DNSCONTROL_URL}
-    echo "${STACKEXCHANGE_DNSCONTROL_HASH} dnscontrol.tar.gz" | sha256sum -c
-    tar -C /tmp/ -xzf dnscontrol.tar.gz
-    rm -rf dnscontrol.tar.gz
-EOF
-
-# Download sd and move to /tmp
-FROM curlimages/curl:latest as sd
-
-ARG CHMLN_SD_URL
-
-RUN <<EOF /bin/sh
-    set -eux
-    curl -H "Accept: application/octet-stream" -Lo sd.tar.gz ${CHMLN_SD_URL}
-    tar -C /tmp/ -xzf sd.tar.gz --strip-components 1
-    rm -rf sd.tar.gz
-EOF
-
-# Download flux and move to /tmp
-FROM curlimages/curl:latest as flux
-
-ARG FLUXCD_FLUX2_URL
-ARG FLUXCD_FLUX2_HASH
-
-RUN <<EOF /bin/sh
-    set -eux
-    curl -H "Accept: application/octet-stream" -Lo flux.tar.gz ${FLUXCD_FLUX2_URL}
-    echo "${FLUXCD_FLUX2_HASH} flux.tar.gz" | sha256sum -c
-    tar -C /tmp/ -xzf flux.tar.gz
-    rm -rf flux.tar.gz
-EOF
-
-FROM $KUBECTL_IMAGE_1_34_2 as kubectl_1_34_2
-
-FROM fedora-minimal:43
+FROM ghcr.io/niule-eu/homelab/tools:latest
 
 ARG USERID
 ARG GROUPID
 ARG USERNAME
-ARG ASTRAL_SH_UV_TAG
-ARG NIULE_EU_HLCLI_TAG
 
-RUN dnf update -y && dnf install -y --setopt=install_weak_deps=False \
-    git \
-    age \
-    bash-completion \
-    tar \
-    bzip2 \
-    gzip \
-    butane \
-    helm-0:3.19.0-1.fc43.x86_64 \
-    yq jq \
-    openssl
-
-COPY --chown=root:root --chmod=0755 --from=golang /tmp/go /usr/local/go
-COPY --chown=root:root --chmod=0755 --from=sops /tmp/sops /usr/local/bin/
-COPY --chown=root:root --chmod=0755 --from=opentofu /tmp/tofu /usr/local/bin/
-COPY --chown=root:root --chmod=0755 --from=podman-remote /tmp/bin/podman* /usr/local/bin/podman-remote
-COPY --chown=root:root --chmod=0755 --from=pkl /tmp/pkl /usr/local/bin/
-COPY --chown=root:root --chmod=0755 --from=java  /opt/java /opt/java
-COPY --chown=root:root --chmod=0755 --from=dnscontrol /tmp/dnscontrol /usr/local/bin/
-COPY --chown=root:root --chmod=0755 --from=sd /tmp/sd /usr/local/bin/
-COPY --chown=root:root --chmod=0644 --from=sd /tmp/completions/sd.bash /usr/share/bash-completion/completions/sd
-COPY --chown=root:root --chmod=0755 --from=kubectl_1_34_2 /bin/kubectl /usr/local/bin/
-COPY --chown=root:root --chmod=0755 --from=flux /tmp/flux /usr/local/bin
-COPY --from=ghcr.io/astral-sh/uv:$ASTRAL_SH_UV_TAG /uv /uvx /bin/
-COPY --from=ghcr.io/niule-eu/hlcli:$NIULE_EU_HLCLI_TAG /ko-app/hlcli /usr/local/bin
+USER 0
 
 # create container user
 RUN <<EOF /bin/bash
     set -eux
     groupadd --gid ${GROUPID} ${USERNAME}
     useradd --create-home --shell /bin/bash --uid ${USERID} --gid ${GROUPID} ${USERNAME}
-EOF
-
-# Add go to path and adjust permissons
-# Note the quotes around "EOF", they tell the container builder not to interpolate ARGs into the script
-RUN <<"EOF" /bin/bash -s ${USERNAME}
-    echo 'export PATH="/usr/local/go/bin:$PATH"' > /etc/profile.d/go_lang.sh
     mkdir -p /home/$USERNAME/.config/sops/age
     chown -R $USERNAME:$USERNAME /home/$USERNAME/.config/
 EOF
@@ -176,8 +31,6 @@ RUN <<"EOF" /bin/bash
     set -eux
     uv tool install mistral-vibe
 EOF
-
-ENV PATH="$PATH:/opt/java/openjdk/bin"
 
 COPY --chown=$USERNAME:$USERNAME podman-connections.json /home/$USERNAME/.config/containers/podman-connections.json
 

@@ -51,6 +51,8 @@ jobs:
               "--file $containerfile"
               "--tag "${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${image_name}:${version}""
               "--tag "${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${image_name}:latest""
+              "--cache-from type=registry,ref=${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${image_name}:buildcache"
+              "--cache-to type=registry,ref=${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${image_name}:buildcache,mode=max"
             )
             for ba in $(cat "$dir/argfile.conf"); do
               cmd+=('--build-arg' "$ba")

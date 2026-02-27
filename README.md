@@ -144,20 +144,6 @@ netsh dns add encryption server=172.16.13.2 dothost="dns.infra.ams23.niule.xyz" 
         name: kustomize-controller
     ```
 
-## ToDo:
-
-1. Implement small go server application
-  1. Expose one url that takes a repo, a username and a commit
-  2. Use https://github.com/google/go-github to authenticate as app (read secrets from env)
-  3. Check if commit is signed https://github.com/google/go-github and if signed by person in allowed signers
-2. Package server app as container
-3. Add container app as sidecar to scale_set template
-4. Curl to app in hook job started
-5. Multiple default routes in podman: https://github.com/containers/podman/issues/23984
-6. https://blog.adathor.com/posts/sops-age-yubikey-sb/
-7. https://www.windowspro.de/wolfgang-sommergut/dns-abfragen-ueber-https-doh-absichern-windows-10-11
-8. https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/about-authentication-with-a-github-app
-
 ### Recreate infra stack on single node k8s cluster
 
 - Provision single-node k0s cluster using ignition

@@ -137,7 +137,7 @@ RUN dnf update -y && dnf install -y --setopt=install_weak_deps=False \
     which \
     make \
     vim \
-    task
+    go-task
 
 COPY --chown=root:root --chmod=0755 --from=golang /tmp/go /usr/local/go
 COPY --chown=root:root --chmod=0755 --from=sops /tmp/sops /usr/local/bin/

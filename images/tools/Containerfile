@@ -69,6 +69,18 @@ RUN <<EOF /bin/sh
     mv pkl /tmp/pkl    
 EOF
 
+# Download cue and move to /tmp
+FROM curlimages/curl:latest as cue
+
+ARG CUE_LANG_CUE_URL
+
+RUN <<EOF /bin/sh
+    set -eux
+    curl -H "Accept: application/octet-stream" -Lo cue.tar.gz ${CUE_LANG_CUE_URL}
+    tar -C /tmp/ -xzf cue.tar.gz
+    chmod +x /tmp/cue  
+EOF
+
 FROM docker.io/eclipse-temurin:22.0.2_9-jdk-ubi9-minimal as java
 
 # Download dnscontrol and move to /tmp
@@ -152,6 +164,7 @@ COPY --chown=root:root --chmod=0755 --from=kubectl_1_34_2 /bin/kubectl /usr/loca
 COPY --chown=root:root --chmod=0755 --from=flux /tmp/flux /usr/local/bin
 COPY --chown=root:root --chmod=0755 --from=astral_uv /uv /uvx /bin/
 COPY --chown=root:root --chmod=0755 --from=niule_hlcli /ko-app/hlcli /usr/local/bin
+COPY --chown=root:root --chmod=0755 --from=cue /tmp/cue /usr/local/bin
 
 # Add go to path and adjust permissons
 # Note the quotes around "EOF", they tell the container builder not to interpolate ARGs into the script

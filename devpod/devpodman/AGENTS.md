@@ -7,7 +7,7 @@
 
 ## Project Overview
 
-CLI tool that reads `devcontainer.json` and starts Podman pods. Schema-driven design using Pkl for type generation.
+CLI tool that reads `devcontainer.json` and starts Podman pods. Schema-driven design using CUE for type generation.
 
 ## Commands
 
@@ -39,8 +39,8 @@ go-task build:ldflags VERSION=1.0.0 COMMIT=abc123 DATE=2026-01-01
 # Format code
 go-task fmt
 
-# Regenerate model types from Pkl
-go-task pkl:generate
+# Regenerate model types from CUE
+go-task cue:generate
 
 # Validate a devcontainer.json
 go-task validate PATH=path/to/devcontainer.json
@@ -64,8 +64,8 @@ go build -tags containers_image_openpgp ./cmd/devpodman/
 # Run CLI
 go run -tags containers_image_openpgp ./cmd/devpodman/ debug --validate path/to/devcontainer.json
 
-# Regenerate model types from Pkl
-pkl run @go/gen.pkl pkl/Schema.pkl
+# Regenerate model types from CUE (must run from model/ directory)
+cd model && cue exp gengotypes .
 ```
 
 ## Architecture
@@ -75,16 +75,16 @@ devpodman/
 ├── cmd/devpodman/       # CLI entry point (urfave/cli/v3)
 ├── devcontainer/        # Parses/validates devcontainer.json
 ├── effects/             # Command pattern for side effects (FileWrite, FileDelete, etc.)
-├── model/               # Auto-generated from Pkl — DO NOT EDIT
-│   ├── build/           #   BuildProperties, BuildProps
-│   ├── common/          #   CommonProperties, Mount, MountType
-│   └── image/           #   ImageProperties
+├── model/               # CUE schema + auto-generated Go types
+│   ├── devcontainer.cue            # Source of truth — CUE schema
+│   ├── schema.go                   # Embeds CUE schema for runtime
+│   └── cue_types_model_gen.go      # Generated Go types (DO NOT EDIT)
 ├── podman/              # Podman client + XDG-aware config loading
-└── pkl/                 # Pkl schema source files (source of truth)
+└── effects/             # Command pattern for side effects (FileWrite, FileDelete, etc.)
 ```
 
-- `model/` files are generated from `pkl/` — never hand-edit them
-- `devcontainer/` is the domain layer: `Load(data []byte)` returns typed build/image/common configs
+- `model/` files are generated from `model/devcontainer.cue` — never hand-edit `cue_types_model_gen.go`
+- `devcontainer/` is the domain layer: `Load(data []byte)` returns `*ResolvedConfig` with CUE-validated build/image/common/noncompose configs
 - `podman/` owns connection management: `Config` via koanf + env vars, `Client` wraps podman bindings
 - `effects/` provides composable side-effect operations with fail-fast and error collection
 
@@ -148,9 +148,19 @@ if val, err := someFunction(); err != nil {
 | `github.com/knadh/koanf/v2` | Layered config loading (env vars, defaults) |
 | `github.com/adrg/xdg` | XDG Base Directory spec (podman socket discovery) |
 | `github.com/containers/podman/v5` | Podman Go bindings |
-| `github.com/apple/pkl-go` | Pkl schema evaluation and code generation |
+| `cuelang.org/go` | CUE schema evaluation and runtime validation |
 
-## Pkl Workflow
+## CUE Workflow
 
-Pkl schema files in `pkl/` are the source of truth. After modifying them, regenerate Go types into `model/`. The generated files have both `pkl:` and `json:` struct tags.
+The CUE schema at `model/devcontainer.cue` is the source of truth for devcontainer configuration types.
+After modifying it, regenerate Go types into `model/cue_types_model_gen.go`:
+
+```bash
+cd model && cue exp gengotypes .
+```
+
+Generated types support both `json:` struct tags for JSON (un)marshalling.
+The schema is embedded at build time via `//go:embed` and used at runtime by `cuelang.org/go` for validation.
+Go parses JSON into the generated structs, then CUE validates each struct against its corresponding definition
+(`#dockerfileContainer`, `#imageContainer`, `#devContainerCommon`, `#nonComposeBase`).
 

@@ -65,10 +65,11 @@ tasks:
     cmds:
       - go mod tidy
 
-  pkl:generate:
-    desc: Regenerate model types from Pkl schema
+  cue:generate:
+    desc: Regenerate model types from CUE schema
+    dir: model
     cmds:
-      - pkl run @go/gen.pkl pkl/Schema.pkl
+      - cue exp gengotypes .
 
   validate:
     desc: Validate a devcontainer.json file

@@ -87,19 +87,19 @@ func debugAction(ctx context.Context, c *cli.Command) error {
 		return fmt.Errorf("failed to read %s: %w", validatePath, err)
 	}
 
-	buildProps, imgProps, commonProps, err := devcontainer.Load(data)
+	cfg, err := devcontainer.Load(data)
 	if err != nil {
 		return err
 	}
 
-	if buildProps != nil {
-		fmt.Fprintf(os.Stdout, "Successfully loaded build config: %+v\n", buildProps.Build.Args)
+	if cfg.Build != nil {
+		fmt.Fprintf(os.Stdout, "Successfully loaded build config: %+v\n", cfg.Build.Build.Args)
 	}
-	if imgProps != nil {
-		fmt.Fprintf(os.Stdout, "Successfully loaded image config: %s\n", imgProps.Image)
+	if cfg.Image != nil {
+		fmt.Fprintf(os.Stdout, "Successfully loaded image config: %s\n", cfg.Image.Image)
 	}
-	if commonProps != nil {
-		fmt.Fprintf(os.Stdout, "Successfully loaded common config: %+v\n", commonProps)
+	if cfg.Common != nil {
+		fmt.Fprintf(os.Stdout, "Successfully loaded common config: %+v\n", cfg.Common)
 	}
 
 	return nil

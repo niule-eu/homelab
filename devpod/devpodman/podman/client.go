@@ -1,0 +1,48 @@
+package podman
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/containers/podman/v5/pkg/bindings"
+	"github.com/containers/podman/v5/pkg/bindings/containers"
+	"github.com/containers/podman/v5/pkg/domain/entities/types"
+)
+
+// Client wraps the podman bindings connection.
+type Client struct {
+	ctx    context.Context
+	config *Config
+}
+
+// NewClient creates a new podman client with the given config.
+func NewClient(ctx context.Context, cfg *Config) (*Client, error) {
+	connCtx, err := bindings.NewConnection(ctx, cfg.ConnectionURI())
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to podman socket %s: %w", cfg.SocketPath, err)
+	}
+
+	return &Client{
+		ctx:    connCtx,
+		config: cfg,
+	}, nil
+}
+
+// Ctx returns the context with the embedded podman connection.
+// This context must be passed to all podman API calls.
+func (c *Client) Ctx() context.Context {
+	return c.ctx
+}
+
+// Config returns the client configuration.
+func (c *Client) Config() *Config {
+	return c.config
+}
+
+// ListContainers returns all containers.
+func (c *Client) ListContainers(ctx context.Context) ([]types.ListContainer, error) {
+	trueVal := true
+	return containers.List(ctx, &containers.ListOptions{
+		All: &trueVal,
+	})
+}

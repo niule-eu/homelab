@@ -1,0 +1,43 @@
+{
+    "build": {
+        "dockerfile": "Containerfile",
+        "context": ".",
+        "args": {
+            "WORKDIR": "/workspaces/${localWorkspaceFolderBasename}",
+            "USERID": "2001",
+            "GROUPID": "2001",
+            "USERNAME": "${localEnv:USER}"
+        }
+    },
+    "runArgs": [
+        "--name", "${localWorkspaceFolderBasename}_dc",
+        "--volume", "${localEnv:HOME}/.ssh:/home/${localEnv:USER}/.ssh:Z",
+        "--volume", "${localEnv:HOME}/.config/sops/age:/home/${localEnv:USER}/.config/sops/age:Z",
+        "--volume", "${devcontainerId}-bashhistory:/commandhistory:Z,U",
+        "--volume", "${devcontainerId}-vibe:/home/${localEnv:USER}/.vibe:Z,U",
+        "--volume", "/run/user/1000/podman/podman.sock:/run/user/2001/podman/podman.sock:z",
+        "--userns", "keep-id:uid=2001,gid=2001",
+        "--hostname", "${localWorkspaceFolderBasename}-dc",
+        "--security-opt", "label:type:container_runtime_t",
+        "--env", "GOPATH=/home/${localEnv:USER}/go",
+        "--env", "LOCAL_WORKSPACE_FOLDER=${localWorkspaceFolder}",
+        "--add-host", "pdnsapi.infra.ams23.niule.xyz:172.16.13.2",
+        "--add-host", "dns.infra.ams23.niule.xyz:172.16.13.2"
+    ],
+    "containerUser": "${localEnv:USER}",
+    "remoteUser": "${localEnv:USER}",
+    "updateRemoteUserUID": false,
+    "remoteEnv": {
+        "EDITOR": "code --wait"
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "golang.go",
+                "hashicorp.terraform",
+                "redhat.vscode-yaml",
+                "pkl.pkl-vscode"
+            ]
+        }
+    }
+}

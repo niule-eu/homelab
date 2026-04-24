@@ -1,0 +1,78 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/go-task/task/main/schema/taskfile.json
+version: '3'
+
+vars:
+  TAGS: containers_image_openpgp
+
+tasks:
+  default:
+    desc: Run all tests
+    cmds:
+      - task: test
+
+  test:
+    desc: Run all tests with required build tags
+    cmds:
+      - go test -tags {{.TAGS}} ./...
+
+  test:verbose:
+    desc: Run all tests with verbose output
+    cmds:
+      - go test -tags {{.TAGS}} -v ./...
+
+  test:package:
+    desc: Run tests for a specific package
+    vars:
+      PACKAGE: '{{.PACKAGE | default "./..."}}'
+    cmds:
+      - go test -tags {{.TAGS}} {{.PACKAGE}}
+
+  test:run:
+    desc: Run a single test by name
+    vars:
+      TEST: '{{.TEST}}'
+    cmds:
+      - go test -tags {{.TAGS}} -run {{.TEST}} -v ./...
+
+  test:file:
+    desc: Run tests in a specific file
+    vars:
+      FILE: '{{.FILE}}'
+    cmds:
+      - go test -tags {{.TAGS}} -v {{.FILE}}
+
+  build:
+    desc: Build the binary with required build tags
+    cmds:
+      - go build -tags {{.TAGS}} ./cmd/devpodman/
+
+  build:ldflags:
+    desc: Build with version ldflags (like goreleaser)
+    vars:
+      VERSION: '{{.VERSION | default "dev"}}'
+      COMMIT: '{{.COMMIT | default "unknown"}}'
+      DATE: '{{.DATE | default "unknown"}}'
+    cmds:
+      - go build -tags {{.TAGS}} -ldflags "-s -w -X main.version={{.VERSION}} -X main.commit={{.COMMIT}} -X main.date={{.DATE}}" ./cmd/devpodman/
+
+  fmt:
+    desc: Format code with gofmt
+    cmds:
+      - gofmt -w .
+
+  tidy:
+    desc: Run go mod tidy
+    cmds:
+      - go mod tidy
+
+  pkl:generate:
+    desc: Regenerate model types from Pkl schema
+    cmds:
+      - pkl run @go/gen.pkl pkl/Schema.pkl
+
+  validate:
+    desc: Validate a devcontainer.json file
+    vars:
+      PATH: '{{.PATH}}'
+    cmds:
+      - go run -tags {{.TAGS}} ./cmd/devpodman/ debug --validate {{.PATH}}

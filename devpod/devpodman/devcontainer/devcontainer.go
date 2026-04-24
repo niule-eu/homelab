@@ -3,97 +3,116 @@ package devcontainer
 import (
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 
+	"cuelang.org/go/cue"
+	"cuelang.org/go/cue/cuecontext"
 	"github.com/distribution/reference"
-	"github.com/niule-eu/devpodman/model/build"
-	"github.com/niule-eu/devpodman/model/common"
-	"github.com/niule-eu/devpodman/model/image"
+
+	"github.com/niule-eu/devpodman/model"
 )
 
-type containerDiscriminator struct {
-	Image string            `json:"image,omitempty"`
-	Build *build.BuildProps `json:"build,omitempty"`
+// ResolvedConfig holds the parsed devcontainer configuration after
+// CUE validation and Go priority resolution.
+type ResolvedConfig struct {
+	Build      *model.DockerfileContainer
+	Image      *model.ImageContainer
+	Common     *model.DevContainerCommon
+	NonCompose *model.NonComposeBase
 }
 
-func Load(data []byte) (*build.BuildProperties, *image.ImageProperties, *common.CommonProperties, error) {
-	var discriminator containerDiscriminator
-	if err := json.Unmarshal(data, &discriminator); err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to parse devcontainer.json: %w", err)
+// Load parses and validates a devcontainer.json byte slice.
+// It validates the JSON against individual CUE definitions and resolves
+// conflicts via Go priority (dockerfile over image).
+func Load(data []byte) (*ResolvedConfig, error) {
+	ctx := cuecontext.New()
+	schema := ctx.CompileString(model.Schema)
+	if err := schema.Err(); err != nil {
+		return nil, fmt.Errorf("failed to compile CUE schema: %w", err)
 	}
 
-	var commonProps common.CommonProperties
-	if err := json.Unmarshal(data, &commonProps); err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to parse devcontainer.json: %w", err)
+	var (
+		dockerfileDC model.DockerfileContainer
+		imageDC      model.ImageContainer
+		commonDC     model.DevContainerCommon
+		nonComposeDC model.NonComposeBase
+		errs         []string
+	)
+
+	// Parse JSON into each struct type independently (open — ignores extra fields)
+	json.Unmarshal(data, &dockerfileDC)
+	json.Unmarshal(data, &imageDC)
+	json.Unmarshal(data, &commonDC)
+	json.Unmarshal(data, &nonComposeDC)
+
+	// Validate dockerfileContainer against its CUE definition
+	dockerfileOK := validateStruct(ctx, schema, "#dockerfileContainer", dockerfileDC)
+	if !dockerfileOK {
+		errs = append(errs, "dockerfile: does not match #dockerfileContainer schema")
 	}
 
-	if discriminator.Image != "" {
-		if discriminator.Build != nil {
-			return nil, nil, nil, fmt.Errorf("devcontainer.json must specify either 'image' or 'build', not both")
+	// Validate imageContainer against its CUE definition
+	imageOK := validateStruct(ctx, schema, "#imageContainer", imageDC)
+
+	// Neither matched
+	if !dockerfileOK && !imageOK {
+		detail := ""
+		if len(errs) > 0 {
+			detail = ": " + joinErrs(errs)
 		}
-		imgProps := &image.ImageProperties{Image: discriminator.Image}
-		if err := validateImage(imgProps); err != nil {
-			return nil, nil, nil, err
-		}
-		if err := validateCommon(&commonProps); err != nil {
-			return nil, nil, nil, err
-		}
-		return nil, imgProps, &commonProps, nil
+		return nil, fmt.Errorf("devcontainer.json must specify either 'image' or 'build'%s", detail)
 	}
 
-	if discriminator.Build != nil {
-		buildProps := &build.BuildProperties{Build: *discriminator.Build}
-		if err := validateBuild(buildProps); err != nil {
-			return nil, nil, nil, err
-		}
-		if err := validateCommon(&commonProps); err != nil {
-			return nil, nil, nil, err
-		}
-		return buildProps, nil, &commonProps, nil
+	cfg := &ResolvedConfig{}
+
+	// Best-effort: populate if schema passes
+	if cOK := validateStruct(ctx, schema, "#devContainerCommon", commonDC); cOK {
+		cfg.Common = &commonDC
+	}
+	if ncOK := validateStruct(ctx, schema, "#nonComposeBase", nonComposeDC); ncOK {
+		cfg.NonCompose = &nonComposeDC
 	}
 
-	return nil, nil, nil, fmt.Errorf("devcontainer.json must specify either 'image' or 'build'")
+	// Priority: dockerfile over image
+	if dockerfileOK {
+		cfg.Build = &dockerfileDC
+		return cfg, nil
+	}
+
+	if err := validateImageReference(imageDC.Image); err != nil {
+		return nil, err
+	}
+	cfg.Image = &imageDC
+	return cfg, nil
 }
 
-func validateImage(img *image.ImageProperties) error {
-	if img.Image == "" {
-		return fmt.Errorf("'image' must not be empty")
+// validateStruct encodes a Go struct as a CUE value and checks it against a definition.
+func validateStruct[T any](ctx *cue.Context, schema cue.Value, defPath string, val T) bool {
+	def := schema.LookupPath(cue.ParsePath(defPath))
+	if !def.Exists() {
+		return false
 	}
-	if err := validateImageReference(img.Image); err != nil {
-		return err
-	}
-	return nil
-}
-
-func validateBuild(bld *build.BuildProperties) error {
-	if bld.Build.Dockerfile == "" {
-		return fmt.Errorf("'build.dockerfile' must not be empty")
-	}
-	if filepath.IsAbs(bld.Build.Dockerfile) {
-		return fmt.Errorf("'build.dockerfile' must be a relative path, got %q", bld.Build.Dockerfile)
-	}
-	if bld.Build.Context != nil && filepath.IsAbs(*bld.Build.Context) {
-		return fmt.Errorf("'build.context' must be a relative path, got %q", *bld.Build.Context)
-	}
-	return nil
-}
-
-func validateCommon(c *common.CommonProperties) error {
-	if c.WorkspaceMount != nil && c.WorkspaceFolder == nil {
-		return fmt.Errorf("'workspaceFolder' must be set when 'workspaceMount' is specified")
-	}
-	if c.WorkspaceFolder != nil && c.WorkspaceMount == nil {
-		return fmt.Errorf("'workspaceMount' must be set when 'workspaceFolder' is specified")
-	}
-	if c.WorkspaceFolder != nil && !filepath.IsAbs(*c.WorkspaceFolder) {
-		return fmt.Errorf("'workspaceFolder' must be an absolute path, got %q", *c.WorkspaceFolder)
-	}
-	return nil
+	v := ctx.Encode(val)
+	u := def.Unify(v)
+	return u.Err() == nil
 }
 
 func validateImageReference(ref string) error {
+	if ref == "" {
+		return fmt.Errorf("'image' must not be empty")
+	}
 	if _, err := reference.ParseNormalizedNamed(ref); err != nil {
 		return fmt.Errorf("'image' must be a valid container image reference, got %q", ref)
 	}
 	return nil
+}
+
+func joinErrs(errs []string) string {
+	s := ""
+	for i, e := range errs {
+		if i > 0 {
+			s += "; "
+		}
+		s += e
+	}
+	return s
 }

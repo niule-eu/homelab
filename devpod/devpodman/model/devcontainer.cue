@@ -204,7 +204,7 @@ package model
 
 #imageContainer: {
 	// The docker image that will be used to create the container.
-	image!: string
+	image!: string & =~"^.+$"
 }
 
 #nonComposeBase: {

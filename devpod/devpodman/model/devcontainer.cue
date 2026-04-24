@@ -29,7 +29,7 @@ package model
 
 	// The location of the context folder for building the Docker
 	// image. The path is relative to the folder containing the
-	// `devcontainer.js on` file.
+	// `devcontainer.json` file.
 	context?: string & =~"^[^/]"
 }
 

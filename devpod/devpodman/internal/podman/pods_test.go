@@ -6,7 +6,7 @@ import (
 )
 
 func TestCreatePod(t *testing.T) {
-	t.Skip("requires podman socket")
+	// t.Skip("requires podman socket")
 
 	cfg, err := LoadConfig()
 	if err != nil {
@@ -19,9 +19,10 @@ func TestCreatePod(t *testing.T) {
 
 	t.Cleanup(func() { _ = client.RemovePod("test-create-pod") })
 
+	ann := map[string]string{"io.podman.annotations.userns": "keep-id"}
 	lbl := map[string]string{"devpodman/managed": "true"}
 
-	report, err := client.CreatePod("test-create-pod", lbl)
+	report, err := client.CreatePod("test-create-pod", ann, lbl)
 	if err != nil {
 		t.Fatalf("CreatePod failed: %v", err)
 	}
@@ -39,7 +40,7 @@ func TestCreatePod(t *testing.T) {
 }
 
 func TestRemovePod(t *testing.T) {
-	t.Skip("requires podman socket")
+	// t.Skip("requires podman socket")
 
 	cfg, err := LoadConfig()
 	if err != nil {

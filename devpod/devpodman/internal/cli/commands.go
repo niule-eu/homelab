@@ -1,15 +1,16 @@
-package main
+package cli
 
 import (
 	"context"
 	"fmt"
 	"os"
 
-	"github.com/niule-eu/devpodman/pkg/devcontainer"
 	"github.com/niule-eu/devpodman/internal/podman"
+	"github.com/niule-eu/devpodman/pkg/devcontainer"
 	"github.com/urfave/cli/v3"
 )
 
+// NewDebugCommand creates the debug subcommand.
 func NewDebugCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "debug",
@@ -65,14 +66,13 @@ func debugAction(ctx context.Context, c *cli.Command) error {
 		return nil
 	}
 
-	dir, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-	fmt.Fprintf(os.Stdout, "Current working directory: %s\n", dir)
-
 	validatePath := c.String("validate")
 	if validatePath == "" {
+		dir, err := os.Getwd()
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(os.Stdout, "Current working directory: %s\n", dir)
 		return nil
 	}
 

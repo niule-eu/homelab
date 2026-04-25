@@ -8,7 +8,7 @@ import (
 	"cuelang.org/go/cue/cuecontext"
 	"github.com/distribution/reference"
 
-	"github.com/niule-eu/devpodman/model"
+	"github.com/niule-eu/devpodman/pkg/model"
 )
 
 // ResolvedConfig holds the parsed devcontainer configuration after

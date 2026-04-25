@@ -5,15 +5,16 @@ import (
 	"log"
 	"os"
 
-	"github.com/urfave/cli/v3"
+	"github.com/niule-eu/devpodman/internal/cli"
+	urfave "github.com/urfave/cli/v3"
 )
 
 func main() {
-	app := &cli.Command{
+	app := &urfave.Command{
 		Name:  "podmandev",
 		Usage: "devcontainers for podman",
-		Commands: []*cli.Command{
-			NewDebugCommand(),
+		Commands: []*urfave.Command{
+			cli.NewDebugCommand(),
 		},
 	}
 	if err := app.Run(context.Background(), os.Args); err != nil {

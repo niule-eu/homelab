@@ -3,17 +3,21 @@ package podman
 import (
 	"fmt"
 
-	types "github.com/containers/podman/v5/pkg/domain/entities/types"
-
 	"github.com/containers/podman/v5/pkg/bindings/pods"
+	types "github.com/containers/podman/v5/pkg/domain/entities/types"
 	"github.com/containers/podman/v5/pkg/specgen"
 )
 
-// CreatePod creates a new pod with the given name and labels.
-func (c *Client) CreatePod(name string, labels map[string]string) (*types.PodCreateReport, error) {
+// CreatePod creates a new pod with the given name, annotations, and labels.
+func (c *Client) CreatePod(name string, annotations, labels map[string]string) (*types.PodCreateReport, error) {
 	s := specgen.NewPodSpecGenerator()
 	s.Name = name
 	s.Labels = labels
+
+	// Map known annotations to PodSpecGenerator fields
+	if v, ok := annotations["io.podman.annotations.userns"]; ok && v == "keep-id" {
+		s.Userns.NSMode = specgen.KeepID
+	}
 
 	report, err := pods.CreatePodFromSpec(c.ctx, &types.PodSpec{PodSpecGen: *s})
 	if err != nil {

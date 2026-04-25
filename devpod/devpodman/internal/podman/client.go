@@ -40,9 +40,9 @@ func (c *Client) Config() *Config {
 }
 
 // ListContainers returns all containers.
-func (c *Client) ListContainers(ctx context.Context) ([]types.ListContainer, error) {
+func (c *Client) ListContainers() ([]types.ListContainer, error) {
 	trueVal := true
-	return containers.List(ctx, &containers.ListOptions{
+	return containers.List(c.ctx, &containers.ListOptions{
 		All: &trueVal,
 	})
 }

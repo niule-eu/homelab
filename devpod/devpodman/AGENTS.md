@@ -25,7 +25,7 @@ go-task test
 go-task test:verbose
 
 # Single package
-go-task test:package PACKAGE=./devcontainer/...
+go-task test:package PACKAGE=./pkg/devcontainer/...
 
 # Single test by name
 go-task test:run TEST=TestLoad
@@ -53,10 +53,10 @@ go-task validate PATH=path/to/devcontainer.json
 go test -tags containers_image_openpgp ./...
 
 # Run tests for a single package
-go test -tags containers_image_openpgp ./podman/...
+go test -tags containers_image_openpgp ./internal/podman/...
 
 # Run a single test
-go test -tags containers_image_openpgp ./devcontainer/... -run TestLoad/loads_image-based_devcontainer -v
+go test -tags containers_image_openpgp ./pkg/devcontainer/... -run TestLoad/loads_image-based_devcontainer -v
 
 # Build
 go build -tags containers_image_openpgp ./cmd/devpodman/
@@ -64,8 +64,8 @@ go build -tags containers_image_openpgp ./cmd/devpodman/
 # Run CLI
 go run -tags containers_image_openpgp ./cmd/devpodman/ debug --validate path/to/devcontainer.json
 
-# Regenerate model types from CUE (must run from model/ directory)
-cd model && cue exp gengotypes .
+# Regenerate model types from CUE (must run from pkg/model/ directory)
+cd pkg/model && cue exp gengotypes .
 ```
 
 ## Architecture
@@ -73,19 +73,23 @@ cd model && cue exp gengotypes .
 ```
 devpodman/
 ├── cmd/devpodman/       # CLI entry point (urfave/cli/v3)
-├── devcontainer/        # Parses/validates devcontainer.json
-├── effects/             # Command pattern for side effects (FileWrite, FileDelete, etc.)
-├── model/               # CUE schema + auto-generated Go types
-│   ├── devcontainer.cue            # Source of truth — CUE schema
-│   ├── schema.go                   # Embeds CUE schema for runtime
-│   └── cue_types_model_gen.go      # Generated Go types (DO NOT EDIT)
-├── podman/              # Podman client + XDG-aware config loading
-└── effects/             # Command pattern for side effects (FileWrite, FileDelete, etc.)
+├── internal/
+│   ├── cli/             # urfave command factories + actions
+│   └── podman/          # Podman client + XDG-aware config loading
+├── pkg/
+│   ├── engine/          # Public API: Play, Down, orchestration
+│   ├── devcontainer/    # Parses/validates devcontainer.json
+│   ├── effects/         # Command pattern for side effects
+│   └── model/           # CUE schema + auto-generated Go types
+│       ├── devcontainer.cue            # Source of truth — CUE schema
+│       ├── schema.go                   # Embeds CUE schema for runtime
+│       └── cue_types_model_gen.go      # Generated Go types (DO NOT EDIT)
 ```
 
 - `model/` files are generated from `model/devcontainer.cue` — never hand-edit `cue_types_model_gen.go`
 - `devcontainer/` is the domain layer: `Load(data []byte)` returns `*ResolvedConfig` with CUE-validated build/image/common/noncompose configs
-- `podman/` owns connection management: `Config` via koanf + env vars, `Client` wraps podman bindings
+- `podman/` owns connection management: `Config` via koanf + env vars, `Client` wraps podman bindings, validates connection on creation
+- `engine/` is the public API: accepts `EngineConnection` (context alias), returns `effects.Compound` sequences
 - `effects/` provides composable side-effect operations with fail-fast and error collection
 
 ## Methodology
@@ -129,6 +133,34 @@ if val, err := someFunction(); err != nil {
 - Wrap errors with context: `fmt.Errorf("failed to parse devcontainer.json: %w", err)`
 - Validate at the boundary — return errors early, don't pass invalid state deeper
 - Error messages: lowercase, no trailing punctuation, describe what went wrong
+
+### Pointer Helpers for Primitives
+
+When passing primitive values as pointers to function calls, use helper functions
+instead of creating temporary variables:
+
+```go
+// ✅ Good
+options := &SomeOptions{
+    Enabled: ptrBool(true),
+    Count:   ptrInt(5),
+}
+
+// ❌ Avoid — creates unnecessary intermediate variables
+enabled := true
+count := 5
+options := &SomeOptions{
+    Enabled: &enabled,
+    Count:   &count,
+}
+```
+
+Define helpers in a `helpers.go` file within the package:
+
+```go
+func ptrBool(b bool) *bool { return &b }
+func ptrInt(i int) *int    { return &i }
+```
 
 ### Testing
 - Standard library `testing` only — no assertion libraries

@@ -16,10 +16,20 @@ type Client struct {
 }
 
 // NewClient creates a new podman client with the given config.
+// It validates the connection by attempting a lightweight API call.
 func NewClient(ctx context.Context, cfg *Config) (*Client, error) {
 	connCtx, err := bindings.NewConnection(ctx, cfg.ConnectionURI())
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to podman socket %s: %w", cfg.SocketPath, err)
+	}
+
+	// Validate connection with a lightweight API call
+	_, err = containers.List(connCtx, &containers.ListOptions{
+		All:  ptrBool(true),
+		Last: ptrInt(1),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("podman connection validation failed: %w", err)
 	}
 
 	return &Client{
@@ -41,8 +51,7 @@ func (c *Client) Config() *Config {
 
 // ListContainers returns all containers.
 func (c *Client) ListContainers() ([]types.ListContainer, error) {
-	trueVal := true
 	return containers.List(c.ctx, &containers.ListOptions{
-		All: &trueVal,
+		All: ptrBool(true),
 	})
 }

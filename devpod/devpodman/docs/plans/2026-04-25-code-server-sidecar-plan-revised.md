@@ -10,46 +10,74 @@
 
 ---
 
-## Target File Structure
+## Progress Status
+
+**Completed:** Tasks 1-5 ✅
+**Remaining:** Tasks 6-9
+
+---
+
+## Key Design Decisions (deviated from original plan)
+
+1. **Connection validation** moved from `internal/cli` into `internal/podman.NewClient()` — fails fast on creation
+2. **Engine effects** use constructor pattern: `NewXxxEffect(conn, ...) effects.Effect` — connection passed in constructor, not to `Apply()`
+3. **No custom `Compound` in engine** — uses `pkg/effects.Compound` directly
+4. **`pkg/engine/connection.go`** — only contains the `EngineConnection` type alias, no `ValidateConnection` (validation is in podman package)
+5. **Effect tests** use real podman integration tests with `testConn()` helper
+6. **Pod name** in `SpecGenerator.Pod` field uses plain name (e.g., `"my-pod"`), NOT `"pod:my-pod"` prefix
+7. **Effect `Apply()` returns `error` only** — no typed reports returned from effects (matches existing `pkg/effects.Effect` interface)
+8. **`DerivePodName` is exported** from `pkg/engine` — CLI computes pod name independently; `Play` returns `(effects.Compound, error)`
+9. **Containerfile is fully Go-templated** — no ARG directives; all variables (versions, UID, GID) substituted at render time
+10. **Connections config** uses a simple template function `RenderConnectionsConfig(socketPath string)` — no `podName` parameter
+11. **Image cleanup in `Down`** omitted for now; `--delete-images` flag accepted but no-op
+12. **`cmd/devpodman/debug.go`** is stale dead code — deleted in Task 9; debug logic lives in `internal/cli/commands.go`
+
+---
+
+## Current File Structure
 
 ```
 devpodman/
 ├── cmd/devpodman/
-│   └── main.go             # MODIFY: import internal/cli
+│   ├── main.go             # MODIFY: register play/down commands
+│   └── debug.go            # DELETE: stale duplicate of internal/cli/commands.go
 ├── internal/
 │   ├── cli/
-│   │   ├── commands.go      # NEW: NewDebugCommand, NewPlayCommand, NewDownCommand factories + actions
-│   │   └── connections.go   # NEW: NewEngineConnection(ctx, cfg) with validation
+│   │   ├── commands.go      # MODIFY: add NewPlayCommand, NewDownCommand
+│   │   ├── commands_test.go # MODIFY: add tests for play/down commands
+│   │   └── connections.go   # EXISTING: NewEngineConnection(ctx, cfg)
 │   └── podman/
-│       ├── client.go        # MOVE from podman/client.go (thin wrapper)
-│       ├── client_test.go   # MOVE
-│       ├── config.go        # MOVE from podman/config.go (koanf + XDG)
-│       ├── config_test.go   # MOVE
-│       └── helpers.go       # MOVE from podman/helpers.go
+│       ├── client.go        # EXISTING (thin wrapper)
+│       ├── client_test.go   # EXISTING
+│       ├── config.go        # EXISTING (koanf + XDG)
+│       ├── config_test.go   # EXISTING
+│       ├── helpers.go       # EXISTING
+│       ├── pods.go          # EXISTING
+│       └── pods_test.go     # EXISTING
 ├── pkg/
 │   ├── engine/
-│   │   ├── engine.go        # NEW: Engine struct, Play, Down methods
+│   │   ├── engine.go        # NEW: Engine struct, Play, Down, DerivePodName
 │   │   ├── engine_test.go   # NEW
-│   │   ├── effects.go       # NEW: BuildImageEffect, CreatePodEffect, CreateContainerEffect, StartContainerEffect, RemovePodEffect, VolumeImportEffect, RemoveVolumeEffect
-│   │   ├── effects_test.go  # NEW
-│   │   ├── sidecar.go       # NEW: sidecar Containerfile template, ImageTag, ConnectionsConfig
+│   │   ├── effects.go       # EXISTING: all effect types with constructor pattern
+│   │   ├── effects_test.go  # EXISTING (fix stale volume test)
+│   │   ├── sidecar.go       # NEW: sidecar Containerfile template, ImageTag, RenderConnectionsConfig
 │   │   ├── sidecar_test.go  # NEW
-│   │   ├── connection.go    # NEW: EngineConnection alias, ValidateConnection
-│   │   ├── connection_test.go
+│   │   ├── connection.go    # EXISTING: EngineConnection alias
+│   │   ├── connection_test.go # EXISTING
 │   │   └── assets/
-│   │       ├── Containerfile    # NEW: go:embed (templated)
+│   │       ├── Containerfile    # NEW: go:embed (fully Go-templated, no ARG)
 │   │       └── devpodman-shell  # NEW: go:embed (shell wrapper)
 │   ├── devcontainer/
-│   │   ├── devcontainer.go  # MOVE from devcontainer/devcontainer.go
-│   │   └── devcontainer_test.go # MOVE
+│   │   ├── devcontainer.go  # EXISTING
+│   │   └── devcontainer_test.go # EXISTING
 │   ├── effects/
-│   │   ├── effects.go       # MOVE from effects/effects.go
-│   │   └── effects_test.go  # MOVE
+│   │   ├── effects.go       # EXISTING: Effect interface, Compound, FileWrite, etc.
+│   │   └── effects_test.go  # EXISTING
 │   └── model/
-│       ├── devcontainer.cue            # MOVE from model/devcontainer.cue
-│       ├── schema.go                   # MOVE
-│       ├── schema_test.go              # MOVE
-│       └── cue_types_model_gen.go      # MOVE
+│       ├── devcontainer.cue            # EXISTING
+│       ├── schema.go                   # EXISTING
+│       ├── schema_test.go              # EXISTING
+│       └── cue_types_model_gen.go      # EXISTING
 └── docs/
     └── plans/
         └── 2026-04-25-code-server-sidecar-plan-revised.md # THIS FILE
@@ -486,342 +514,27 @@ git commit -m "feat(engine): add EngineConnection alias and ValidateConnection"
 
 ---
 
-### Task 5: Create `pkg/engine/effects.go` with engine-specific effect types
+### Task 5: Create `pkg/engine/effects.go` with engine-specific effect types ✅ DONE
 
 **Files:**
-- Create: `pkg/engine/effects.go`
-- Create: `pkg/engine/effects_test.go`
+- Created: `pkg/engine/effects.go`
+- Created: `pkg/engine/effects_test.go`
 
-- [ ] **Step 1: Write the failing test**
+**Design decisions:**
+- Effects implement `pkg/effects.Effect` interface (`Apply() error`)
+- Connection passed via constructor: `NewXxxEffect(conn EngineConnection, ...) effects.Effect`
+- No custom `Compound` in engine — uses `pkg/effects.Compound` directly
+- Integration tests with real podman via `testConn()` helper
 
-```go
-package engine
-
-import (
-	"context"
-	"testing"
-
-	"github.com/containers/podman/v5/pkg/bindings"
-	"github.com/containers/podman/v5/pkg/specgen"
-)
-
-func TestBuildImageEffect(t *testing.T) {
-	effect := BuildImageEffect{
-		ContextDir: ".",
-		Dockerfile: "Containerfile",
-		Tag:        "test-image:latest",
-	}
-	if effect.Tag != "test-image:latest" {
-		t.Fatalf("expected tag 'test-image:latest', got %q", effect.Tag)
-	}
-}
-
-func TestCreatePodEffect(t *testing.T) {
-	effect := CreatePodEffect{
-		Name:        "test-pod",
-		Annotations: map[string]string{"io.podman.annotations.userns": "keep-id"},
-		Labels:      map[string]string{"devpodman/managed": "true"},
-	}
-	if effect.Name != "test-pod" {
-		t.Fatalf("expected name 'test-pod', got %q", effect.Name)
-	}
-}
-
-func TestCreateContainerEffect(t *testing.T) {
-	spec := specgen.NewSpecGenerator("test-image", false)
-	effect := CreateContainerEffect{
-		Spec: spec,
-	}
-	if effect.Spec.Image != "test-image" {
-		t.Fatalf("expected image 'test-image', got %q", effect.Spec.Image)
-	}
-}
-
-func TestStartContainerEffect(t *testing.T) {
-	effect := StartContainerEffect{
-		Name: "test-container",
-	}
-	if effect.Name != "test-container" {
-		t.Fatalf("expected name 'test-container', got %q", effect.Name)
-	}
-}
-
-func TestRemovePodEffect(t *testing.T) {
-	effect := RemovePodEffect{
-		Name: "test-pod",
-	}
-	if effect.Name != "test-pod" {
-		t.Fatalf("expected name 'test-pod', got %q", effect.Name)
-	}
-}
-
-func TestVolumeImportEffect(t *testing.T) {
-	effect := VolumeImportEffect{
-		Name:    "test-volume",
-		TarData: []byte("fake-tar-data"),
-	}
-	if effect.Name != "test-volume" {
-		t.Fatalf("expected name 'test-volume', got %q", effect.Name)
-	}
-}
-
-func TestRemoveVolumeEffect(t *testing.T) {
-	effect := RemoveVolumeEffect{
-		Name: "test-volume",
-	}
-	if effect.Name != "test-volume" {
-		t.Fatalf("expected name 'test-volume', got %q", effect.Name)
-	}
-}
-
-func TestStartPodEffect(t *testing.T) {
-	effect := StartPodEffect{
-		Name: "test-pod",
-	}
-	if effect.Name != "test-pod" {
-		t.Fatalf("expected name 'test-pod', got %q", effect.Name)
-	}
-}
-
-// Integration test with real podman socket
-func TestCreatePodEffect_Apply(t *testing.T) {
-	cfg, err := loadTestConfig()
-	if err != nil {
-		t.Skipf("podman not available: %v", err)
-	}
-
-	connCtx, err := newTestConnection(context.Background(), cfg)
-	if err != nil {
-		t.Skipf("podman connection failed: %v", err)
-	}
-
-	t.Cleanup(func() {
-		_ = RemovePodEffect{Name: "test-effects-pod"}.Apply(connCtx)
-	})
-
-	effect := CreatePodEffect{
-		Name:        "test-effects-pod",
-		Annotations: map[string]string{"io.podman.annotations.userns": "keep-id"},
-		Labels:      map[string]string{"devpodman/managed": "true"},
-	}
-
-	report, err := effect.Apply(connCtx)
-	if err != nil {
-		t.Fatalf("Apply failed: %v", err)
-	}
-	if report.Id == "" {
-		t.Fatal("expected non-empty pod ID")
-	}
-}
-
-func loadTestConfig() (*testConfig, error) {
-	// Use internal/podman config loading
-	return nil, nil // simplified for test structure
-}
-
-func newTestConnection(ctx context.Context, cfg *testConfig) (context.Context, error) {
-	return bindings.NewConnection(ctx, "unix:///run/podman/podman.sock")
-}
-
-type testConfig struct {
-	SocketPath string
-}
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-```bash
-go test -tags containers_image_openpgp ./pkg/engine/... -run TestBuildImageEffect -v
-```
-
-Expected: FAIL with "undefined: BuildImageEffect"
-
-- [ ] **Step 3: Write minimal implementation**
-
-```go
-package engine
-
-import (
-	"context"
-	"fmt"
-	"io"
-
-	"github.com/containers/podman/v5/pkg/bindings/containers"
-	"github.com/containers/podman/v5/pkg/bindings/images"
-	"github.com/containers/podman/v5/pkg/bindings/pods"
-	"github.com/containers/podman/v5/pkg/bindings/volumes"
-	"github.com/containers/podman/v5/pkg/domain/entities/types"
-	"github.com/containers/podman/v5/pkg/specgen"
-)
-
-// BuildImageEffect builds a container image from a Dockerfile.
-type BuildImageEffect struct {
-	ContextDir string
-	Dockerfile string
-	Tag        string
-	BuildArgs  map[string]string
-}
-
-func (e BuildImageEffect) Apply(conn EngineConnection) (*types.ImageBuildReport, error) {
-	report, err := images.Build(conn, []string{e.ContextDir}, &images.BuildOptions{
-		Dockerfiles: []string{e.Dockerfile},
-		Tags:        []string{e.Tag},
-		BuildArgs:   e.BuildArgs,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to build image %q: %w", e.Tag, err)
-	}
-	return report, nil
-}
-
-// CreatePodEffect creates a new pod with the given name, annotations, and labels.
-type CreatePodEffect struct {
-	Name        string
-	Annotations map[string]string
-	Labels      map[string]string
-}
-
-func (e CreatePodEffect) Apply(conn EngineConnection) (*types.PodCreateReport, error) {
-	s := specgen.NewPodSpecGenerator()
-	s.Name = e.Name
-	s.Labels = e.Labels
-
-	if v, ok := e.Annotations["io.podman.annotations.userns"]; ok && v == "keep-id" {
-		s.Userns.NSMode = specgen.KeepID
-	}
-
-	report, err := pods.CreatePodFromSpec(conn, &types.PodSpec{PodSpecGen: *s})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create pod %q: %w", e.Name, err)
-	}
-	return report, nil
-}
-
-// CreateContainerEffect creates a container in a pod using the given spec.
-type CreateContainerEffect struct {
-	Spec *specgen.SpecGenerator
-}
-
-func (e CreateContainerEffect) Apply(conn EngineConnection) (*types.ContainerCreateResponse, error) {
-	resp, err := containers.CreateWithSpec(conn, e.Spec, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create container: %w", err)
-	}
-	return resp, nil
-}
-
-// StartContainerEffect starts a container by name or ID.
-type StartContainerEffect struct {
-	Name string
-}
-
-func (e StartContainerEffect) Apply(conn EngineConnection) error {
-	_, err := containers.Start(conn, e.Name, nil)
-	if err != nil {
-		return fmt.Errorf("failed to start container %q: %w", e.Name, err)
-	}
-	return nil
-}
-
-// StartPodEffect starts a pod by name.
-type StartPodEffect struct {
-	Name string
-}
-
-func (e StartPodEffect) Apply(conn EngineConnection) error {
-	_, err := pods.Start(conn, e.Name, nil)
-	if err != nil {
-		return fmt.Errorf("failed to start pod %q: %w", e.Name, err)
-	}
-	return nil
-}
-
-// RemovePodEffect stops and removes a pod and all its containers.
-type RemovePodEffect struct {
-	Name string
-}
-
-func (e RemovePodEffect) Apply(conn EngineConnection) error {
-	exists, err := pods.Exists(conn, e.Name, &pods.ExistsOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to check if pod %q exists: %w", e.Name, err)
-	}
-	if !exists {
-		return nil
-	}
-	_, err = pods.Remove(conn, e.Name, &pods.RemoveOptions{Force: ptrBool(true)})
-	if err != nil {
-		return fmt.Errorf("failed to remove pod %q: %w", e.Name, err)
-	}
-	return nil
-}
-
-// VolumeImportEffect creates a podman volume by importing a tar stream.
-type VolumeImportEffect struct {
-	Name    string
-	TarData []byte
-}
-
-func (e VolumeImportEffect) Apply(conn EngineConnection) (*types.VolumeCreateReport, error) {
-	// First create the volume
-	createReport, err := volumes.Create(conn, &types.VolumeCreateOptions{
-		Name: e.Name,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create volume %q: %w", e.Name, err)
-	}
-
-	// Then import the tar data into it
-	reader := io.NopCloser(io.LimitReader(bytes.NewReader(e.TarData), int64(len(e.TarData))))
-	_, err = volumes.Import(conn, e.Name, reader, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to import data into volume %q: %w", e.Name, err)
-	}
-
-	return createReport, nil
-}
-
-// RemoveVolumeEffect removes a podman volume.
-type RemoveVolumeEffect struct {
-	Name string
-}
-
-func (e RemoveVolumeEffect) Apply(conn EngineConnection) error {
-	exists, err := volumes.Exists(conn, e.Name, nil)
-	if err != nil {
-		return fmt.Errorf("failed to check if volume %q exists: %w", e.Name, err)
-	}
-	if !exists {
-		return nil
-	}
-	_, err = volumes.Remove(conn, e.Name, nil)
-	if err != nil {
-		return fmt.Errorf("failed to remove volume %q: %w", e.Name, err)
-	}
-	return nil
-}
-
-func ptrBool(b bool) *bool {
-	return &b
-}
-```
-
-Note: Add `"bytes"` and `"io"` to imports.
-
-- [ ] **Step 4: Run test to verify it passes**
-
-```bash
-go test -tags containers_image_openpgp ./pkg/engine/... -run "TestBuildImageEffect|TestCreatePodEffect|TestCreateContainerEffect|TestStartContainerEffect|TestRemovePodEffect|TestVolumeImportEffect|TestRemoveVolumeEffect|TestStartPodEffect" -v
-```
-
-Expected: PASS for unit tests, SKIP for integration test if podman not available
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add pkg/engine/effects.go pkg/engine/effects_test.go
-git commit -m "feat(engine): add engine-specific effect types"
-```
+**Effect types:**
+- `BuildImageEffect` — `NewBuildImageEffect(conn, contextDir, dockerfile, tag, buildArgs)`
+- `CreatePodEffect` — `NewCreatePodEffect(conn, name, annotations, labels)`
+- `CreateContainerEffect` — `NewCreateContainerEffect(conn, spec)`
+- `StartContainerEffect` — `NewStartContainerEffect(conn, name)`
+- `StartPodEffect` — `NewStartPodEffect(conn, name)`
+- `RemovePodEffect` — `NewRemovePodEffect(conn, name)`
+- `VolumeImportEffect` — `NewVolumeImportEffect(conn, name, tarData)`
+- `RemoveVolumeEffect` — `NewRemoveVolumeEffect(conn, name)`
 
 ---
 
@@ -833,52 +546,14 @@ git commit -m "feat(engine): add engine-specific effect types"
 - Create: `pkg/engine/assets/Containerfile`
 - Create: `pkg/engine/assets/devpodman-shell`
 
-- [ ] **Step 1: Create the Containerfile template**
-
-```dockerfile
-# Containerfile for devpodman code-server sidecar
-ARG PODMAN_REMOTE_VERSION=5.8.2
-ARG CODE_SERVER_VERSION=4.98.2
-
-FROM ghcr.io/mgoltzsche/podman:${PODMAN_REMOTE_VERSION}-remote AS podman-remote
-FROM docker.io/codercom/code-server:${CODE_SERVER_VERSION}
-
-# Copy podman-remote binary
-COPY --from=podman-remote /usr/bin/podman-remote /usr/local/bin/podman
-
-# Create devpodman user matching host UID/GID
-RUN groupadd -g USER_GID devpodman && \
-    useradd -m -u USER_UID -g USER_GID -s /bin/bash devpodman
-
-# Copy devpodman shell wrapper
-COPY devpodman-shell /usr/local/bin/devpodman-shell
-RUN chmod +x /usr/local/bin/devpodman-shell
-
-USER devpodman
-WORKDIR /workspace
-
-EXPOSE 8080
-
-CMD ["code-server", "--bind-addr", "0.0.0.0:8080", "/workspace"]
-```
-
-- [ ] **Step 2: Create the devpodman-shell wrapper**
-
-```bash
-#!/bin/bash
-# devpodman-shell - proxies terminal commands into the main container
-# Usage: devpodman-shell <command> [args...]
-
-exec podman exec -it "${MAIN_CONTAINER_NAME}" "$@"
-```
-
-- [ ] **Step 3: Write the failing test**
+- [ ] **Step 1: Write the failing test**
 
 ```go
 package engine
 
 import (
 	"bytes"
+	_ "embed"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -894,9 +569,38 @@ func TestImageTag(t *testing.T) {
 }
 
 func TestContainerfileTemplate(t *testing.T) {
+	rendered, err := RenderContainerfile(1000, 1000)
+	if err != nil {
+		t.Fatalf("RenderContainerfile failed: %v", err)
+	}
+
+	// Verify versions are substituted
+	if !strings.Contains(rendered, "ghcr.io/mgoltzsche/podman:5.8.2-remote") {
+		t.Error("expected podman remote version substituted")
+	}
+	if !strings.Contains(rendered, "docker.io/codercom/code-server:4.98.2") {
+		t.Error("expected code-server version substituted")
+	}
+
+	// Verify no ARG directives remain
+	if strings.Contains(rendered, "ARG ") {
+		t.Error("expected no ARG directives in rendered template")
+	}
+
+	// Verify UID/GID values are inlined
+	if !strings.Contains(rendered, "groupadd -g 1000 devpodman") {
+		t.Error("expected USER_GID inlined in groupadd")
+	}
+	if !strings.Contains(rendered, "useradd -m -u 1000 -g 1000") {
+		t.Error("expected USER_UID/USER_GID inlined in useradd")
+	}
+}
+
+func TestContainerfileTemplate_Parse(t *testing.T) {
+	// Verify the raw embedded template parses correctly
 	tmpl, err := template.New("Containerfile").Parse(containerfileTemplate)
 	if err != nil {
-		t.Fatalf("failed to parse template: %v", err)
+		t.Fatalf("failed to parse Containerfile template: %v", err)
 	}
 
 	data := ContainerfileTemplateData{
@@ -910,33 +614,10 @@ func TestContainerfileTemplate(t *testing.T) {
 	if err := tmpl.Execute(&buf, data); err != nil {
 		t.Fatalf("failed to render template: %v", err)
 	}
-
-	rendered := buf.String()
-
-	// Verify versions are substituted
-	if !strings.Contains(rendered, "ghcr.io/mgoltzsche/podman:5.8.2-remote") {
-		t.Error("expected podman remote version substituted")
-	}
-	if !strings.Contains(rendered, "docker.io/codercom/code-server:4.98.2") {
-		t.Error("expected code-server version substituted")
-	}
-
-	// Verify no ARG directives remain (UID/GID are templated directly)
-	if strings.Contains(rendered, "ARG USER_UID") || strings.Contains(rendered, "ARG USER_GID") {
-		t.Error("expected no ARG USER_UID/USER_GID in rendered template")
-	}
-
-	// Verify UID/GID values are inlined
-	if !strings.Contains(rendered, "groupadd -g 1000 devpodman") {
-		t.Error("expected USER_GID inlined in groupadd")
-	}
-	if !strings.Contains(rendered, "useradd -m -u 1000 -g 1000") {
-		t.Error("expected USER_UID/USER_GID inlined in useradd")
-	}
 }
 
-func TestConnectionsConfig(t *testing.T) {
-	cfg := ConnectionsConfig("/run/user/1000/podman/podman.sock", "test-pod")
+func TestRenderConnectionsConfig(t *testing.T) {
+	cfg := RenderConnectionsConfig("/run/user/1000/podman/podman.sock")
 	if cfg == "" {
 		t.Fatal("expected non-empty config")
 	}
@@ -946,16 +627,64 @@ func TestConnectionsConfig(t *testing.T) {
 	if err := json.Unmarshal([]byte(cfg), &v); err != nil {
 		t.Fatalf("config is not valid JSON: %v", err)
 	}
+
+	// Verify socket path is present
+	if !strings.Contains(cfg, "unix:///run/user/1000/podman/podman.sock") {
+		t.Error("expected socket URI in config")
+	}
+}
+
+func TestDevpodmanShellEmbedded(t *testing.T) {
+	if devpodmanShellScript == "" {
+		t.Fatal("expected non-empty devpodman-shell script")
+	}
+	if !strings.HasPrefix(devpodmanShellScript, "#!/bin/bash") {
+		t.Error("expected shebang line in devpodman-shell")
+	}
+	if !strings.Contains(devpodmanShellScript, "MAIN_CONTAINER_NAME") {
+		t.Error("expected MAIN_CONTAINER_NAME reference in devpodman-shell")
+	}
 }
 ```
 
-- [ ] **Step 4: Run test to verify it fails**
+- [ ] **Step 2: Run test to verify it fails**
 
 ```bash
 go test -tags containers_image_openpgp ./pkg/engine/... -run TestImageTag -v
 ```
 
 Expected: FAIL with "undefined: ImageTag"
+
+- [ ] **Step 3: Create the Containerfile template**
+
+Fully Go-templated — no ARG directives. All variables (versions, UID, GID) substituted at render time.
+
+```dockerfile
+FROM ghcr.io/mgoltzsche/podman:{{.PodmanRemoteVersion}}-remote AS podman-remote
+FROM docker.io/codercom/code-server:{{.CodeServerVersion}}
+
+COPY --from=podman-remote /usr/bin/podman-remote /usr/local/bin/podman
+
+RUN groupadd -g {{.UserGID}} devpodman && \
+    useradd -m -u {{.UserUID}} -g {{.UserGID}} -s /bin/bash devpodman
+
+COPY devpodman-shell /usr/local/bin/devpodman-shell
+RUN chmod +x /usr/local/bin/devpodman-shell
+
+USER devpodman
+WORKDIR /workspace
+
+EXPOSE 8080
+
+CMD ["code-server", "--bind-addr", "0.0.0.0:8080", "/workspace"]
+```
+
+- [ ] **Step 4: Create the devpodman-shell wrapper**
+
+```bash
+#!/bin/bash
+exec podman exec -it "${MAIN_CONTAINER_NAME}" "$@"
+```
 
 - [ ] **Step 5: Write minimal implementation**
 
@@ -1025,30 +754,23 @@ func RenderContainerfile(uid, gid int) (string, error) {
 	return buf.String(), nil
 }
 
-// ConnectionsConfigValue represents the podman-connections.json structure.
-type ConnectionsConfigValue struct {
-	Connection struct {
-		Default string `json:"default"`
-	} `json:"connection"`
-	Engines struct {
-		Host struct {
-			URI   string `json:"URI"`
-			Root  bool   `json:"Root"`
-			Identity string `json:"Identity,omitempty"`
-		} `json:"host"`
-	} `json:"Engines"`
-}
-
-// ConnectionsConfig generates the podman-connections.json content.
-func ConnectionsConfig(socketPath, podName string) string {
-	cfg := ConnectionsConfigValue{}
-	cfg.Connection.Default = "host"
-	cfg.Engines.Host.URI = "unix://" + socketPath
-	cfg.Engines.Host.Root = false
+// RenderConnectionsConfig generates the podman-connections.json content
+// for the sidecar to connect back to the host podman socket.
+func RenderConnectionsConfig(socketPath string) string {
+	cfg := map[string]any{
+		"connection": map[string]string{
+			"default": "host",
+		},
+		"Engines": map[string]any{
+			"host": map[string]any{
+				"URI":   "unix://" + socketPath,
+				"Root":  false,
+			},
+		},
+	}
 
 	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
-		// Should never happen with this simple struct
 		return "{}"
 	}
 
@@ -1059,7 +781,7 @@ func ConnectionsConfig(socketPath, podName string) string {
 - [ ] **Step 6: Run test to verify it passes**
 
 ```bash
-go test -tags containers_image_openpgp ./pkg/engine/... -run "TestImageTag|TestContainerfileTemplate|TestConnectionsConfig" -v
+go test -tags containers_image_openpgp ./pkg/engine/... -run "TestImageTag|TestContainerfileTemplate|TestRenderConnectionsConfig|TestDevpodmanShellEmbedded" -v
 ```
 
 Expected: PASS
@@ -1078,6 +800,8 @@ git commit -m "feat(engine): add sidecar image building logic"
 **Files:**
 - Create: `pkg/engine/engine.go`
 - Create: `pkg/engine/engine_test.go`
+
+**Note:** Use the actual effect constructor pattern: `NewXxxEffect(conn, ...)`. Use `pkg/effects.Compound`, not a custom engine Compound.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1145,6 +869,8 @@ Expected: FAIL with "undefined: New"
 package engine
 
 import (
+	"archive/tar"
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -1165,9 +891,8 @@ func New() *Engine {
 
 // Play returns a Compound effect that creates a devcontainer pod
 // with a main container and code-server sidecar.
-func (e *Engine) Play(ctx context.Context, cfg *devcontainer.ResolvedConfig, workspaceDir string) (effects.Compound, error) {
-	projectName := deriveProjectName(cfg, workspaceDir)
-	podName := "devpodman-" + projectName
+func (e *Engine) Play(conn EngineConnection, cfg *devcontainer.ResolvedConfig, workspaceDir string) (effects.Compound, error) {
+	podName := DerivePodName(cfg, workspaceDir)
 	mainContainerName := podName + "-main"
 	sidecarName := podName + "-code-server"
 
@@ -1176,7 +901,7 @@ func (e *Engine) Play(ctx context.Context, cfg *devcontainer.ResolvedConfig, wor
 	sidecarTag := ImageTag(uid)
 
 	// Resolve main image
-	mainImage, err := resolveMainImage(cfg, projectName)
+	mainImage, err := resolveMainImage(cfg, podName)
 	if err != nil {
 		return effects.Compound{}, err
 	}
@@ -1189,12 +914,11 @@ func (e *Engine) Play(ctx context.Context, cfg *devcontainer.ResolvedConfig, wor
 
 	// Generate connections config
 	socketPath := detectSocketPath()
-	connectionsJSON := ConnectionsConfig(socketPath, podName)
+	connectionsJSON := RenderConnectionsConfig(socketPath)
 
 	var effs []effects.Effect
 
-	// Effect 1: Build sidecar image
-	// We need to write the Containerfile to a temp dir first
+	// Effect 1: Write Containerfile and shell script to temp dir
 	tmpDir := filepath.Join(os.TempDir(), "devpodman-"+podName)
 	containerfilePath := filepath.Join(tmpDir, "Containerfile")
 	shellPath := filepath.Join(tmpDir, "devpodman-shell")
@@ -1209,73 +933,56 @@ func (e *Engine) Play(ctx context.Context, cfg *devcontainer.ResolvedConfig, wor
 		Content:     []byte(devpodmanShellScript),
 		Permissions: 0755,
 	})
-	effs = append(effs, BuildImageEffect{
-		ContextDir: tmpDir,
-		Dockerfile: "Containerfile",
-		Tag:        sidecarTag,
-	})
+	effs = append(effs, NewBuildImageEffect(conn, tmpDir, "Containerfile", sidecarTag, nil))
 
 	// Effect 2: Create volumes for sidecar assets
 	connectionsVolumeName := podName + "-connections"
-	effs = append(effs, VolumeImportEffect{
-		Name:    connectionsVolumeName,
-		TarData: createTarForFile("podman-connections.json", []byte(connectionsJSON)),
-	})
+	effs = append(effs, NewVolumeImportEffect(conn, connectionsVolumeName, createTarForFile("podman-connections.json", []byte(connectionsJSON))))
 
-	// Effect 3: Create pod and containers
-	effs = append(effs, CreatePodEffect{
-		Name: podName,
-		Annotations: map[string]string{
-			"io.podman.annotations.userns": "keep-id",
-		},
-		Labels: map[string]string{
-			"devpodman/managed": "true",
-			"devpodman/project": projectName,
-		},
-	})
+	// Effect 3: Create pod
+	effs = append(effs, NewCreatePodEffect(conn, podName, map[string]string{
+		"io.podman.annotations.userns": "keep-id",
+	}, map[string]string{
+		"devpodman/managed": "true",
+	}))
 
 	// Main container spec
 	mainSpec := buildMainContainerSpec(cfg, mainImage, mainContainerName, podName, workspaceDir)
-	effs = append(effs, CreateContainerEffect{Spec: mainSpec})
+	effs = append(effs, NewCreateContainerEffect(conn, mainSpec))
 
 	// Sidecar container spec
 	sidecarSpec := buildSidecarContainerSpec(sidecarTag, sidecarName, podName, mainContainerName, connectionsVolumeName, workspaceDir)
-	effs = append(effs, CreateContainerEffect{Spec: sidecarSpec})
+	effs = append(effs, NewCreateContainerEffect(conn, sidecarSpec))
 
 	// Effect 4: Start pod (starts all containers in the pod)
-	effs = append(effs, StartPodEffect{Name: podName})
+	effs = append(effs, NewStartPodEffect(conn, podName))
 
 	return effects.Compound{Effects: effs, FailFast: true}, nil
 }
 
 // Down returns a Compound effect that stops and removes a devcontainer pod.
-func (e *Engine) Down(ctx context.Context, podName string, deleteImages bool) (effects.Compound, error) {
+func (e *Engine) Down(conn EngineConnection, podName string, deleteImages bool) (effects.Compound, error) {
 	var effs []effects.Effect
 
 	// Effect 1: Remove pod (force, includes containers)
-	effs = append(effs, RemovePodEffect{Name: podName})
+	effs = append(effs, NewRemovePodEffect(conn, podName))
 
 	// Effect 2: Remove associated volumes
 	connectionsVolumeName := podName + "-connections"
-	effs = append(effs, RemoveVolumeEffect{Name: connectionsVolumeName})
+	effs = append(effs, NewRemoveVolumeEffect(conn, connectionsVolumeName))
 
-	// Effect 3: Optionally remove sidecar image
-	if deleteImages {
-		// Image removal would go here - podman bindings don't have a simple
-		// image remove via the connection context API, so we defer this
-		effs = append(effs, effects.Stdout{
-			Message: "Image cleanup not yet implemented",
-		})
-	}
+	// Image cleanup: omitted for now; flag accepted but no-op
 
 	return effects.Compound{Effects: effs, FailFast: true}, nil
 }
 
-func deriveProjectName(cfg *devcontainer.ResolvedConfig, dir string) string {
+// DerivePodName returns the deterministic pod name for a config + workspace dir.
+// Exported so the CLI can compute the pod name independently.
+func DerivePodName(cfg *devcontainer.ResolvedConfig, workspaceDir string) string {
 	if cfg.Common != nil && cfg.Common.Name != "" {
-		return sanitizeName(cfg.Common.Name)
+		return "devpodman-" + sanitizeName(cfg.Common.Name)
 	}
-	return sanitizeName(filepath.Base(dir))
+	return "devpodman-" + sanitizeName(filepath.Base(workspaceDir))
 }
 
 func sanitizeName(name string) string {
@@ -1304,12 +1011,12 @@ func trim(s string, cut rune) string {
 	return s[start:end]
 }
 
-func resolveMainImage(cfg *devcontainer.ResolvedConfig, projectName string) (string, error) {
+func resolveMainImage(cfg *devcontainer.ResolvedConfig, podName string) (string, error) {
 	if cfg.Image != nil {
 		return cfg.Image.Image, nil
 	}
 	if cfg.Build != nil {
-		return "devpodman-" + projectName + "-main", nil
+		return podName + "-main", nil
 	}
 	return "", fmt.Errorf("devcontainer.json must specify 'image' or 'build'")
 }
@@ -1324,7 +1031,7 @@ func detectSocketPath() string {
 func buildMainContainerSpec(cfg *devcontainer.ResolvedConfig, image, name, podName, dir string) *specgen.SpecGenerator {
 	spec := specgen.NewSpecGenerator(image, false)
 	spec.Name = name
-	spec.Pod = "pod:" + podName
+	spec.Pod = podName
 	spec.Command = []string{"sleep", "infinity"}
 	spec.WorkDir = "/workspace"
 
@@ -1378,7 +1085,7 @@ func buildMainContainerSpec(cfg *devcontainer.ResolvedConfig, image, name, podNa
 func buildSidecarContainerSpec(image, name, podName, mainContainerName, connectionsVolumeName, workspaceDir string) *specgen.SpecGenerator {
 	spec := specgen.NewSpecGenerator(image, false)
 	spec.Name = name
-	spec.Pod = "pod:" + podName
+	spec.Pod = podName
 	spec.Command = []string{"code-server", "--bind-addr", "0.0.0.0:8080", "/workspace"}
 	spec.Env = map[string]string{
 		"MAIN_CONTAINER_NAME": mainContainerName,
@@ -1409,11 +1116,18 @@ func buildSidecarContainerSpec(image, name, podName, mainContainerName, connecti
 	return spec
 }
 
-// createTarForFile creates a minimal tar archive containing a single file.
 func createTarForFile(name string, data []byte) []byte {
-	// Simplified - in practice this would use archive/tar
-	// For now, return raw bytes that will be improved in implementation
-	return data
+	var buf bytes.Buffer
+	tw := tar.NewWriter(&buf)
+	hdr := &tar.Header{
+		Name: name,
+		Mode: 0644,
+		Size: int64(len(data)),
+	}
+	tw.WriteHeader(hdr)
+	tw.Write(data)
+	tw.Close()
+	return buf.Bytes()
 }
 ```
 
@@ -1438,6 +1152,8 @@ git commit -m "feat(engine): add Play and Down methods returning effect compound
 
 **Files:**
 - Modify: `internal/cli/commands.go`
+
+**Note:** `Engine.Play` takes `EngineConnection` (not `context.Context`). Use `pkg/effects.Compound`. Effects use constructor pattern.
 
 - [ ] **Step 1: Add Play and Down command factories**
 
@@ -1496,8 +1212,7 @@ func playAction(ctx context.Context, c *cli.Command) error {
 		return fmt.Errorf("failed to apply play effects: %w", err)
 	}
 
-	projectName := deriveProjectProjectName(cfg, workspaceDir)
-	fmt.Fprintf(os.Stdout, "Pod %q started\n", "devpodman-"+projectName)
+	fmt.Fprintf(os.Stdout, "Pod %q started\n", engine.DerivePodName(cfg, workspaceDir))
 	fmt.Fprintf(os.Stdout, "code-server: http://localhost:%d\n", engine.CodeServerHostPort)
 
 	return nil
@@ -1547,39 +1262,6 @@ func downAction(ctx context.Context, c *cli.Command) error {
 
 	fmt.Fprintf(os.Stdout, "Pod %q removed\n", podName)
 	return nil
-}
-
-func deriveProjectProjectName(cfg *devcontainer.ResolvedConfig, dir string) string {
-	if cfg.Common != nil && cfg.Common.Name != "" {
-		return sanitizeProjectName(cfg.Common.Name)
-	}
-	return sanitizeProjectName(filepath.Base(dir))
-}
-
-func sanitizeProjectName(name string) string {
-	result := make([]rune, 0, len(name))
-	for _, r := range name {
-		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' {
-			result = append(result, r)
-		} else {
-			result = append(result, '-')
-		}
-	}
-	trimmed := string(result)
-	trimmed = trimProject(trimmed, '-')
-	return trimmed
-}
-
-func trimProject(s string, cut rune) string {
-	start := 0
-	for start < len(s) && rune(s[start]) == cut {
-		start++
-	}
-	end := len(s)
-	for end > start && rune(s[end-1]) == cut {
-		end--
-	}
-	return s[start:end]
 }
 ```
 
@@ -1638,32 +1320,78 @@ git commit -m "feat(cli): add play and down commands wired to engine"
 
 ---
 
-### Task 9: Clean up old files and final validation
+### Task 9: Clean up stale files, fix test, final validation
 
 **Files:**
-- Delete: old `podman/` directory if any remnants remain
-- Verify: all imports resolve correctly
+- Delete: `cmd/devpodman/debug.go` (stale duplicate of `internal/cli/commands.go`)
+- Fix: `pkg/engine/effects_test.go` (stale volume name collision)
 
-- [ ] **Step 1: Verify no stale imports**
+- [ ] **Step 1: Delete stale `cmd/devpodman/debug.go`**
+
+This file duplicates the debug command that now lives in `internal/cli/commands.go`.
+`main.go` imports `cli.NewDebugCommand()` from `internal/cli`, making this dead code.
 
 ```bash
-rg "github.com/niule-eu/devpodman/(devcontainer|effects|model|podman)" --type go
+rm cmd/devpodman/debug.go
+```
+
+- [ ] **Step 2: Fix stale volume test in `pkg/engine/effects_test.go`**
+
+The `TestRemoveVolumeEffect_Apply/removes_existing_volume` subtest uses a fixed volume name
+`test-remove-vol` that can collide across test runs. Use a unique suffix:
+
+```go
+func TestRemoveVolumeEffect_Apply(t *testing.T) {
+	conn := testConn(t)
+
+	t.Run("removes existing volume", func(t *testing.T) {
+		volName := "test-remove-vol-" + t.Name()
+		tarData := makeTarFile("test.txt", []byte("hello"))
+		importEff := NewVolumeImportEffect(conn, volName, tarData)
+		if err := importEff.Apply(); err != nil {
+			t.Fatalf("failed to create test volume: %v", err)
+		}
+		t.Cleanup(func() { _ = NewRemoveVolumeEffect(conn, volName).Apply() })
+
+		eff := NewRemoveVolumeEffect(conn, volName)
+		err := eff.Apply()
+		if err != nil {
+			t.Fatalf("Apply() failed: %v", err)
+		}
+	})
+
+	t.Run("returns nil for nonexistent volume", func(t *testing.T) {
+		eff := NewRemoveVolumeEffect(conn, "test-nonexistent-vol-xyz")
+		err := eff.Apply()
+		if err != nil {
+			t.Fatalf("expected nil for nonexistent volume, got: %v", err)
+		}
+	})
+}
+```
+
+- [ ] **Step 3: Verify no stale imports**
+
+```bash
+rg "github.com/niule-eu/devpodman/(devcontainer|effects|model|podman)[^/]" --type go
 ```
 
 Expected: No matches (all imports should use `pkg/` or `internal/` paths)
 
-- [ ] **Step 2: Run full build and test suite**
+- [ ] **Step 4: Run full build and test suite**
 
 ```bash
 go build -tags containers_image_openpgp ./cmd/devpodman/
 go test -tags containers_image_openpgp ./...
 ```
 
-- [ ] **Step 3: Commit**
+Expected: All tests pass (integration tests may skip if podman not available)
+
+- [ ] **Step 5: Commit**
 
 ```bash
 git add -A
-git commit -m "chore: remove stale files and verify clean build"
+git commit -m "chore: remove stale debug.go, fix volume test collision"
 ```
 
 ---
@@ -1683,8 +1411,20 @@ go-task build
 
 ## Self-Review Checklist
 
-1. **Spec coverage:** All elements from the revised design are covered: engine API returning effects, EngineConnection alias with validation, separate effect types for each operation, sidecar image building with templated Containerfile, volume import for connections config, play/down lifecycle, golang-standards/project-layout structure.
+1. **Spec coverage:** All elements from the revised design are covered: engine API returning effects, EngineConnection alias with validation (in podman package), separate effect types for each operation using constructor pattern, sidecar image building with fully Go-templated Containerfile (no ARG directives), volume import for connections config, play/down lifecycle, golang-standards/project-layout structure.
 
-2. **Placeholder scan:** No TBD, TODO, or fill-in-the-details markers. The `createTarForFile` function is simplified but clearly marked for improvement.
+2. **Placeholder scan:** No TBD, TODO, or fill-in-the-details markers. The `createTarForFile` function is fully implemented using `archive/tar`. Image cleanup in `Down` is explicitly documented as omitted.
 
-3. **Type consistency:** `EngineConnection` alias used consistently. Effect types defined in `effects.go` used in `engine.go`. Sidecar constants (`CodeServerPort`, `CodeServerHostPort`) defined in `sidecar.go` and used in `engine.go` and CLI actions. `deriveProjectName`/`sanitizeName` patterns consistent across engine and CLI.
+3. **Type consistency:** `EngineConnection` alias used consistently. Effect types use constructor pattern (`NewXxxEffect(conn, ...)`) returning `effects.Effect` with `Apply() error`. `pkg/effects.Compound` used directly. Sidecar constants (`CodeServerPort`, `CodeServerHostPort`) defined in `sidecar.go`. `DerivePodName` is exported from `pkg/engine` — CLI uses it directly, no duplicate sanitization logic. `SpecGenerator.Pod` uses plain pod name (no `"pod:"` prefix).
+
+4. **Deviation from original plan:**
+   - Connection validation moved to `internal/podman.NewClient()` (Task 3)
+   - `pkg/engine/connection.go` has only the type alias, no `ValidateConnection` (Task 4)
+   - Effects use constructor pattern, not struct literals with `Apply(conn)` (Task 5)
+   - No custom `Compound` in engine — uses `pkg/effects.Compound` directly (Task 5)
+   - `Engine.Play` returns `(effects.Compound, error)` — pod name computed via exported `DerivePodName`
+   - `ConnectionsConfig` replaced with `RenderConnectionsConfig(socketPath string)` — no `podName` param
+   - Containerfile fully Go-templated — no ARG directives remain
+   - Image cleanup in `Down` omitted for now
+   - `cmd/devpodman/debug.go` deleted as stale dead code
+   - Volume test fixed with unique names to prevent stale collision

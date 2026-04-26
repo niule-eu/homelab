@@ -1,0 +1,17 @@
+FROM ghcr.io/mgoltzsche/podman:{{.PodmanRemoteVersion}}-remote AS podman-remote
+FROM docker.io/codercom/code-server:{{.CodeServerVersion}}
+
+COPY --from=podman-remote /usr/bin/podman-remote /usr/local/bin/podman
+
+RUN groupadd -g {{.UserGID}} devpodman && \
+    useradd -m -u {{.UserUID}} -g {{.UserGID}} -s /bin/bash devpodman
+
+COPY devpodman-shell /usr/local/bin/devpodman-shell
+RUN chmod +x /usr/local/bin/devpodman-shell
+
+USER devpodman
+WORKDIR /workspace
+
+EXPOSE 8080
+
+CMD ["code-server", "--bind-addr", "0.0.0.0:8080", "/workspace"]

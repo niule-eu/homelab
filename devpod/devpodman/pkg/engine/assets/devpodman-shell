@@ -1,0 +1,2 @@
+#!/bin/bash
+exec podman exec -it "${MAIN_CONTAINER_NAME}" "$@"

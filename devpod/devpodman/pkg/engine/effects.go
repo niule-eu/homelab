@@ -24,7 +24,13 @@ type BuildImageEffect struct {
 }
 
 func NewBuildImageEffect(conn EngineConnection, contextDir, dockerfile, tag string, buildArgs map[string]string) effects.Effect {
-	return BuildImageEffect{conn: conn, ContextDir: contextDir, Dockerfile: dockerfile, Tag: tag, BuildArgs: buildArgs}
+	return BuildImageEffect{
+		conn:       conn,
+		ContextDir: contextDir,
+		Dockerfile: dockerfile,
+		Tag:        tag,
+		BuildArgs:  buildArgs,
+	}
 }
 
 func (e BuildImageEffect) Apply() error {

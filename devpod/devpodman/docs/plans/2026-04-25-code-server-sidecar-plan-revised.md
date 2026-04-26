@@ -527,7 +527,7 @@ git commit -m "feat(engine): add EngineConnection alias and ValidateConnection"
 - Integration tests with real podman via `testConn()` helper
 
 **Effect types:**
-- `BuildImageEffect` — `NewBuildImageEffect(conn, contextDir, dockerfile, tag, buildArgs)`
+- `BuildImageEffect` — `NewBuildImageEffect(conn, contextDir, containerfile, tag, buildArgs)`
 - `CreatePodEffect` — `NewCreatePodEffect(conn, name, annotations, labels)`
 - `CreateContainerEffect` — `NewCreateContainerEffect(conn, spec)`
 - `StartContainerEffect` — `NewStartContainerEffect(conn, name)`

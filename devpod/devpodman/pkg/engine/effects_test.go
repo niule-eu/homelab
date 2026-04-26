@@ -4,9 +4,13 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/containers/podman/v5/pkg/bindings/images"
 	"github.com/containers/podman/v5/pkg/specgen"
+	"github.com/distribution/reference"
 	"github.com/niule-eu/devpodman/internal/podman"
 	"github.com/niule-eu/devpodman/pkg/effects"
 )
@@ -22,6 +26,37 @@ func testConn(t *testing.T) EngineConnection {
 		t.Skipf("podman connection failed: %v", err)
 	}
 	return client.Ctx()
+}
+
+func TestBuildImageEffect_Apply(t *testing.T) {
+	conn := testConn(t)
+
+	tmpDir := t.TempDir()
+	containerfile := filepath.Join(tmpDir, "Containerfile")
+	content := []byte("FROM scratch\n")
+	if err := os.WriteFile(containerfile, content, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	imageTag := "devpodman-test-build:latest"
+	tagRef, err := reference.ParseNormalizedNamed(imageTag)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tagged, ok := tagRef.(reference.NamedTagged)
+	if !ok {
+		t.Fatal("expected NamedTagged reference")
+	}
+
+	t.Cleanup(func() {
+		_, _ = images.Remove(conn, []string{imageTag}, nil)
+	})
+
+	eff := NewBuildImageEffect(conn, tmpDir, "Containerfile", tagged, nil)
+	err = eff.Apply()
+	if err != nil {
+		t.Fatalf("Apply() failed: %v", err)
+	}
 }
 
 func TestCreatePodEffect_Apply(t *testing.T) {
@@ -173,7 +208,8 @@ func TestStartContainerEffect_Apply(t *testing.T) {
 }
 
 func TestEngineEffectsImplementEffectInterface(t *testing.T) {
-	var _ effects.Effect = NewBuildImageEffect(nil, ".", "Dockerfile", "img:latest", nil)
+	tagRef, _ := reference.ParseNormalizedNamed("img:latest")
+	var _ effects.Effect = NewBuildImageEffect(nil, ".", "Containerfile", tagRef.(reference.NamedTagged), nil)
 	var _ effects.Effect = NewCreatePodEffect(nil, "pod", nil, nil)
 	var _ effects.Effect = NewCreateContainerEffect(nil, specgen.NewSpecGenerator("img", false))
 	var _ effects.Effect = NewStartContainerEffect(nil, "ct")

@@ -11,38 +11,45 @@ import (
 	"github.com/containers/podman/v5/pkg/bindings/volumes"
 	"github.com/containers/podman/v5/pkg/domain/entities/types"
 	"github.com/containers/podman/v5/pkg/specgen"
+	"github.com/distribution/reference"
 	"github.com/niule-eu/devpodman/pkg/effects"
 )
 
-// BuildImageEffect builds a container image from a Dockerfile.
+// BuildImageEffect builds a container image from a Containerfle.
 type BuildImageEffect struct {
-	conn       EngineConnection
-	ContextDir string
-	Dockerfile string
-	Tag        string
-	BuildArgs  map[string]string
+	conn          EngineConnection
+	ContextDir    string
+	Containerfile string
+	Tag           reference.NamedTagged
+	BuildArgs     map[string]string
 }
 
-func NewBuildImageEffect(conn EngineConnection, contextDir, dockerfile, tag string, buildArgs map[string]string) effects.Effect {
+func NewBuildImageEffect(
+	conn EngineConnection,
+	contextDir string,
+	containerfile string,
+	tag reference.NamedTagged,
+	buildArgs map[string]string) effects.Effect {
 	return BuildImageEffect{
-		conn:       conn,
-		ContextDir: contextDir,
-		Dockerfile: dockerfile,
-		Tag:        tag,
-		BuildArgs:  buildArgs,
+		conn:          conn,
+		ContextDir:    contextDir,
+		Containerfile: containerfile,
+		Tag:           tag,
+		BuildArgs:     buildArgs,
 	}
 }
 
 func (e BuildImageEffect) Apply() error {
-	opts := types.BuildOptions{
-		BuildOptions: define.BuildOptions{
-			Output: e.Tag,
-			Args:   e.BuildArgs,
-		},
-		ContainerFiles: []string{e.Dockerfile},
-	}
+		opts := types.BuildOptions{
+			BuildOptions: define.BuildOptions{
+				Output:           e.Tag.String(),
+				Args:             e.BuildArgs,
+				ContextDirectory: e.ContextDir,
+			},
+			ContainerFiles: []string{e.Containerfile},
+		}
 
-	_, err := images.Build(e.conn, []string{e.ContextDir}, opts)
+	_, err := images.Build(e.conn, []string{e.Containerfile}, opts)
 	if err != nil {
 		return fmt.Errorf("failed to build image %q: %w", e.Tag, err)
 	}

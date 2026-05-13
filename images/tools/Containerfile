@@ -1,4 +1,4 @@
-ARG KUBECTL_IMAGE_1_34_2
+ARG KUBECTL_IMAGE
 ARG ASTRAL_SH_UV_TAG
 ARG NIULE_EU_HLCLI_TAG
 
@@ -123,7 +123,7 @@ RUN <<EOF /bin/sh
     rm -rf flux.tar.gz
 EOF
 
-FROM $KUBECTL_IMAGE_1_34_2 as kubectl_1_34_2
+FROM $KUBECTL_IMAGE as kubectl
 
 FROM ghcr.io/astral-sh/uv:$ASTRAL_SH_UV_TAG as astral_uv
 
@@ -160,7 +160,7 @@ COPY --chown=root:root --chmod=0755 --from=java  /opt/java /opt/java
 COPY --chown=root:root --chmod=0755 --from=dnscontrol /tmp/dnscontrol /usr/local/bin/
 COPY --chown=root:root --chmod=0755 --from=sd /tmp/sd /usr/local/bin/
 COPY --chown=root:root --chmod=0644 --from=sd /tmp/completions/sd.bash /usr/share/bash-completion/completions/sd
-COPY --chown=root:root --chmod=0755 --from=kubectl_1_34_2 /bin/kubectl /usr/local/bin/
+COPY --chown=root:root --chmod=0755 --from=kubectl /bin/kubectl /usr/local/bin/
 COPY --chown=root:root --chmod=0755 --from=flux /tmp/flux /usr/local/bin
 COPY --chown=root:root --chmod=0755 --from=astral_uv /uv /uvx /bin/
 COPY --chown=root:root --chmod=0755 --from=niule_hlcli /ko-app/hlcli /usr/local/bin

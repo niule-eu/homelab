@@ -35,7 +35,7 @@ package model
 
 #devContainerCommon: {
 	// A name for the dev container.
-	name?: string
+	name?: string & =~"^[a-z0-9A-Z][a-z0-9A-Z_.-]*[a-z0-9A-Z]$"
 
 	// Features to add to the dev container.
 	features?: {
@@ -190,7 +190,7 @@ package model
 	// Tool-specific configuration. Each tool should use a JSON object
 	// subproperty with a unique name to group its customizations.
 	customizations?: {
-		...
+		devpodman?: #devpodmanCustomization
 	}
 	additionalProperties?: {
 		...
@@ -241,4 +241,12 @@ package model
 	// the project folder at /workspaces/$project.
 	workspaceMount?: #Mount 
 
+}
+
+#devpodmanCustomization: {
+	workdir: #devpodmanWorkdir
+}
+
+#devpodmanWorkdir: {
+	emptyVol: bool | *false
 }

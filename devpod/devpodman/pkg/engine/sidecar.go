@@ -28,6 +28,9 @@ var containerfileTemplate string
 //go:embed assets/devpodman-shell
 var devpodmanShellScript string
 
+//go:embed assets/settings.json
+var settingsJSON string
+
 // ContainerfileTemplateData holds the variables for the Containerfile template.
 type ContainerfileTemplateData struct {
 	PodmanRemoteVersion string
@@ -67,13 +70,12 @@ func RenderContainerfile(uid, gid int) (string, error) {
 // for the sidecar to connect back to the host podman socket.
 func RenderConnectionsConfig(socketPath string) string {
 	cfg := map[string]any{
-		"connection": map[string]string{
-			"default": "host",
-		},
-		"Engines": map[string]any{
-			"host": map[string]any{
-				"URI":  "unix://" + socketPath,
-				"Root": false,
+		"Connection": map[string]any{
+			"Default": "host",
+			"Connections": map[string]any{
+				"host": map[string]any{
+					"URI": "unix://" + socketPath,
+				},
 			},
 		},
 	}

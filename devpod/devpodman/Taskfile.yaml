@@ -67,7 +67,7 @@ tasks:
 
   cue:generate:
     desc: Regenerate model types from CUE schema
-    dir: model
+    dir: pkg/model
     cmds:
       - cue exp gengotypes .
 

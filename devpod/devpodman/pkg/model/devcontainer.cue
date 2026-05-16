@@ -229,7 +229,7 @@ package model
 	// their editor. The default is to stop the container.
 	shutdownAction?: "none" | "stopContainer"
 
-	privileged?:    bool
+	privileged?: bool
 	// Whether to overwrite the command specified in the image. The
 	// default is true.
 	overrideCommand?: bool
@@ -239,12 +239,26 @@ package model
 
 	// The --mount parameter for docker run. The default is to mount
 	// the project folder at /workspaces/$project.
-	workspaceMount?: #Mount 
-
+	workspaceMount?: #Mount
 }
 
 #devpodmanCustomization: {
-	workdir: #devpodmanWorkdir
+	command:    [...string] // defaults to *["sleep", "infinity"]
+	args:       [...string] // defaults to *[]
+	workdir:    #devpodmanWorkdir
+	network:    #devpodmanNetwork
+	codeServer: #devpodmanCodeServer
+}
+
+#devpodmanNetwork: {
+	enabled: bool | *true
+	name?:   string & =~"^[a-z0-9A-Z][a-z0-9A-Z_.-]*[a-z0-9A-Z]$" // defaults to devpod name + '-network'
+}
+
+#devpodmanCodeServer: {
+	enabled:       bool | *true
+	containerPort: int & <=65535 & >=0 | *8080
+	hostPort:      int & <=65535 & >=0 | *8080
 }
 
 #devpodmanWorkdir: {

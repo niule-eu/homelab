@@ -159,9 +159,41 @@ type DevContainerCommon struct {
 
 	// Tool-specific configuration. Each tool should use a JSON object
 	// subproperty with a unique name to group its customizations.
-	Customizations map[string]any/* CUE top */ `json:"customizations,omitempty"`
+	Customizations struct {
+		Devpodman DevpodmanCustomization `json:"devpodman,omitempty"`
+	} `json:"customizations,omitempty"`
 
 	AdditionalProperties map[string]any/* CUE top */ `json:"additionalProperties,omitempty"`
+}
+
+type DevpodmanCustomization struct {
+	Command []string `json:"command"`
+
+	Args []string `json:"args"`
+
+	Workdir DevpodmanWorkdir `json:"workdir"`
+
+	Network DevpodmanNetwork `json:"network"`
+
+	CodeServer DevpodmanCodeServer `json:"codeServer"`
+}
+
+type DevpodmanWorkdir struct {
+	EmptyVol bool `json:"emptyVol"`
+}
+
+type DevpodmanNetwork struct {
+	Enabled bool `json:"enabled"`
+
+	Name string `json:"name,omitempty"`
+}
+
+type DevpodmanCodeServer struct {
+	Enabled bool `json:"enabled"`
+
+	ContainerPort int64 `json:"containerPort"`
+
+	HostPort int64 `json:"hostPort"`
 }
 
 type DockerfileContainer struct {

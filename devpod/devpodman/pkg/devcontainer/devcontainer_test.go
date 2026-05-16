@@ -10,7 +10,7 @@ import (
 func TestLoadImageContainer(t *testing.T) {
 	t.Run("loads image-based devcontainer", func(t *testing.T) {
 		data := []byte(`{
-			"name": "Go Dev",
+			"name": "Go-Dev",
 			"image": "mcr.microsoft.com/devcontainers/go:1",
 			"remoteUser": "vscode"
 		}`)
@@ -28,8 +28,8 @@ func TestLoadImageContainer(t *testing.T) {
 		if cfg.Image.Image != "mcr.microsoft.com/devcontainers/go:1" {
 			t.Fatalf("expected image 'mcr.microsoft.com/devcontainers/go:1', got %q", cfg.Image.Image)
 		}
-		if cfg.Common == nil || cfg.Common.Name != "Go Dev" {
-			t.Fatalf("expected name 'Go Dev', got %v", cfg.Common)
+		if cfg.Common == nil || cfg.Common.Name != "Go-Dev" {
+			t.Fatalf("expected name 'Go-Dev', got %v", cfg.Common)
 		}
 		if cfg.Common.RemoteUser != "vscode" {
 			t.Fatalf("expected remoteUser 'vscode', got %q", cfg.Common.RemoteUser)
@@ -40,7 +40,7 @@ func TestLoadImageContainer(t *testing.T) {
 func TestLoadBuildContainer(t *testing.T) {
 	t.Run("loads build-based devcontainer", func(t *testing.T) {
 		data := []byte(`{
-			"name": "Custom Build",
+			"name": "Custom-Build",
 			"build": {
 				"dockerfile": "Dockerfile",
 				"context": ".",
@@ -67,8 +67,8 @@ func TestLoadBuildContainer(t *testing.T) {
 		if cfg.Build.Build.Target != "dev" {
 			t.Fatalf("expected target 'dev', got %q", cfg.Build.Build.Target)
 		}
-		if cfg.Common == nil || cfg.Common.Name != "Custom Build" {
-			t.Fatalf("expected name 'Custom Build', got %v", cfg.Common)
+		if cfg.Common == nil || cfg.Common.Name != "Custom-Build" {
+			t.Fatalf("expected name 'Custom-Build', got %v", cfg.Common)
 		}
 	})
 }
@@ -240,7 +240,7 @@ func TestLoadEdgeCases(t *testing.T) {
 		path := filepath.Join(tmp, "devcontainer.json")
 		content := `{
 			"image": "golang:1.22",
-			"name": "File Test"
+			"name": "File-Test"
 		}`
 		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
 			t.Fatal(err)
@@ -259,8 +259,8 @@ func TestLoadEdgeCases(t *testing.T) {
 		if cfg.Image == nil || cfg.Image.Image != "golang:1.22" {
 			t.Fatalf("expected image 'golang:1.22', got %v", cfg.Image)
 		}
-		if cfg.Common == nil || cfg.Common.Name != "File Test" {
-			t.Fatalf("expected name 'File Test', got %v", cfg.Common)
+		if cfg.Common == nil || cfg.Common.Name != "File-Test" {
+			t.Fatalf("expected name 'File-Test', got %v", cfg.Common)
 		}
 	})
 }

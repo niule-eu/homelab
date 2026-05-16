@@ -61,11 +61,15 @@ func TestBuildImageEffect_Apply(t *testing.T) {
 
 func TestCreatePodEffect_Apply(t *testing.T) {
 	conn := testConn(t)
+
+	if err := NewCreateNetworkEffect(conn, devpodmanNetwork).Apply(); err != nil {
+		t.Fatalf("failed to create network: %v", err)
+	}
 	t.Cleanup(func() {
 		_ = NewRemovePodEffect(conn, "test-effects-pod").Apply()
 	})
 
-	eff := NewCreatePodEffect(conn, "test-effects-pod", map[string]string{"io.podman.annotations.userns": "keep-id"}, map[string]string{"devpodman/managed": "true"})
+	eff := NewCreatePodEffect(conn, "test-effects-pod", map[string]string{"io.podman.annotations.userns": "keep-id"}, map[string]string{"devpodman/managed": "true"}, nil)
 	err := eff.Apply()
 	if err != nil {
 		t.Fatalf("Apply() failed: %v", err)
@@ -75,9 +79,13 @@ func TestCreatePodEffect_Apply(t *testing.T) {
 func TestRemovePodEffect_Apply(t *testing.T) {
 	conn := testConn(t)
 
+	if err := NewCreateNetworkEffect(conn, devpodmanNetwork).Apply(); err != nil {
+		t.Fatalf("failed to create network: %v", err)
+	}
+
 	t.Run("removes existing pod", func(t *testing.T) {
 		// Create a pod first
-		createEff := NewCreatePodEffect(conn, "test-remove-pod", nil, nil)
+		createEff := NewCreatePodEffect(conn, "test-remove-pod", nil, nil, nil)
 		if createErr := createEff.Apply(); createErr != nil {
 			t.Fatalf("failed to create test pod: %v", createErr)
 		}
@@ -99,11 +107,15 @@ func TestRemovePodEffect_Apply(t *testing.T) {
 
 func TestStartPodEffect_Apply(t *testing.T) {
 	conn := testConn(t)
+
+	if err := NewCreateNetworkEffect(conn, devpodmanNetwork).Apply(); err != nil {
+		t.Fatalf("failed to create network: %v", err)
+	}
 	t.Cleanup(func() {
 		_ = NewRemovePodEffect(conn, "test-start-pod").Apply()
 	})
 
-	createEff := NewCreatePodEffect(conn, "test-start-pod", nil, nil)
+	createEff := NewCreatePodEffect(conn, "test-start-pod", nil, nil, nil)
 	if err := createEff.Apply(); err != nil {
 		t.Fatalf("failed to create pod: %v", err)
 	}
@@ -158,11 +170,15 @@ func TestRemoveVolumeEffect_Apply(t *testing.T) {
 
 func TestCreateContainerEffect_Apply(t *testing.T) {
 	conn := testConn(t)
+
+	if err := NewCreateNetworkEffect(conn, devpodmanNetwork).Apply(); err != nil {
+		t.Fatalf("failed to create network: %v", err)
+	}
 	t.Cleanup(func() {
 		_ = NewRemovePodEffect(conn, "test-ct-pod").Apply()
 	})
 
-	createEff := NewCreatePodEffect(conn, "test-ct-pod", nil, nil)
+	createEff := NewCreatePodEffect(conn, "test-ct-pod", nil, nil, nil)
 	if err := createEff.Apply(); err != nil {
 		t.Fatalf("failed to create pod: %v", err)
 	}
@@ -181,11 +197,15 @@ func TestCreateContainerEffect_Apply(t *testing.T) {
 
 func TestStartContainerEffect_Apply(t *testing.T) {
 	conn := testConn(t)
+
+	if err := NewCreateNetworkEffect(conn, devpodmanNetwork).Apply(); err != nil {
+		t.Fatalf("failed to create network: %v", err)
+	}
 	t.Cleanup(func() {
 		_ = NewRemovePodEffect(conn, "test-start-ct-pod").Apply()
 	})
 
-	createEff := NewCreatePodEffect(conn, "test-start-ct-pod", nil, nil)
+	createEff := NewCreatePodEffect(conn, "test-start-ct-pod", nil, nil, nil)
 	if err := createEff.Apply(); err != nil {
 		t.Fatalf("failed to create pod: %v", err)
 	}
@@ -210,7 +230,7 @@ func TestStartContainerEffect_Apply(t *testing.T) {
 func TestEngineEffectsImplementEffectInterface(t *testing.T) {
 	tagRef, _ := reference.ParseNormalizedNamed("img:latest")
 	var _ effects.Effect = NewBuildImageEffect(nil, ".", "Containerfile", tagRef.(reference.NamedTagged), nil)
-	var _ effects.Effect = NewCreatePodEffect(nil, "pod", nil, nil)
+	var _ effects.Effect = NewCreatePodEffect(nil, "pod", nil, nil, nil)
 	var _ effects.Effect = NewCreateContainerEffect(nil, specgen.NewSpecGenerator("img", false))
 	var _ effects.Effect = NewStartContainerEffect(nil, "ct")
 	var _ effects.Effect = NewStartPodEffect(nil, "pod")

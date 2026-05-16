@@ -1,0 +1,18 @@
+{
+    "terminal.integrated.profiles.linux": {
+        "main": {
+            "path": "devpodman-shell",
+            "overrideName": "main",
+        },
+        "bash": {
+            "path": "bash",
+            "icon": "terminal-bash"
+        },
+        "zsh": null,
+        "fish": null,
+        "tmux": null,
+        "pwsh": null,
+        "default": null,
+    },
+    "terminal.integrated.defaultProfile.linux": "main"
+}

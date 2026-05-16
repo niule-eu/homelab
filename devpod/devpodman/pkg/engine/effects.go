@@ -7,13 +7,17 @@ import (
 	"github.com/containers/buildah/define"
 	"github.com/containers/podman/v5/pkg/bindings/containers"
 	"github.com/containers/podman/v5/pkg/bindings/images"
+	"github.com/containers/podman/v5/pkg/bindings/network"
 	"github.com/containers/podman/v5/pkg/bindings/pods"
 	"github.com/containers/podman/v5/pkg/bindings/volumes"
 	"github.com/containers/podman/v5/pkg/domain/entities/types"
 	"github.com/containers/podman/v5/pkg/specgen"
 	"github.com/distribution/reference"
 	"github.com/niule-eu/devpodman/pkg/effects"
+	nettypes "go.podman.io/common/libnetwork/types"
 )
+
+const devpodmanNetwork = "devpodman"
 
 // BuildImageEffect builds a container image from a Containerfle.
 type BuildImageEffect struct {
@@ -40,14 +44,14 @@ func NewBuildImageEffect(
 }
 
 func (e BuildImageEffect) Apply() error {
-		opts := types.BuildOptions{
-			BuildOptions: define.BuildOptions{
-				Output:           e.Tag.String(),
-				Args:             e.BuildArgs,
-				ContextDirectory: e.ContextDir,
-			},
-			ContainerFiles: []string{e.Containerfile},
-		}
+	opts := types.BuildOptions{
+		BuildOptions: define.BuildOptions{
+			Output:           e.Tag.String(),
+			Args:             e.BuildArgs,
+			ContextDirectory: e.ContextDir,
+		},
+		ContainerFiles: []string{e.Containerfile},
+	}
 
 	_, err := images.Build(e.conn, []string{e.Containerfile}, opts)
 	if err != nil {
@@ -56,22 +60,87 @@ func (e BuildImageEffect) Apply() error {
 	return nil
 }
 
-// CreatePodEffect creates a new pod with the given name, annotations, and labels.
-type CreatePodEffect struct {
-	conn        EngineConnection
-	Name        string
-	Annotations map[string]string
-	Labels      map[string]string
+// CreateNetworkEffect creates a podman network if it doesn't already exist.
+type CreateNetworkEffect struct {
+	conn EngineConnection
+	Name string
 }
 
-func NewCreatePodEffect(conn EngineConnection, name string, annotations, labels map[string]string) effects.Effect {
-	return CreatePodEffect{conn: conn, Name: name, Annotations: annotations, Labels: labels}
+func NewCreateNetworkEffect(conn EngineConnection, name string) effects.Effect {
+	return CreateNetworkEffect{conn: conn, Name: name}
+}
+
+func (e CreateNetworkEffect) Apply() error {
+	exists, err := network.Exists(e.conn, e.Name, nil)
+	if err != nil {
+		return fmt.Errorf("failed to check if network %q exists: %w", e.Name, err)
+	}
+	if exists {
+		return nil
+	}
+
+	_, err = network.Create(e.conn, &nettypes.Network{Name: e.Name})
+	if err != nil {
+		return fmt.Errorf("failed to create network %q: %w", e.Name, err)
+	}
+	return nil
+}
+
+// RemoveNetworkEffect removes a podman network. Returns nil if the network
+// doesn't exist or still has containers attached.
+type RemoveNetworkEffect struct {
+	conn EngineConnection
+	Name string
+}
+
+func NewRemoveNetworkEffect(conn EngineConnection, name string) effects.Effect {
+	return RemoveNetworkEffect{conn: conn, Name: name}
+}
+
+func (e RemoveNetworkEffect) Apply() error {
+	exists, err := network.Exists(e.conn, e.Name, nil)
+	if err != nil {
+		return fmt.Errorf("failed to check if network %q exists: %w", e.Name, err)
+	}
+	if !exists {
+		return nil
+	}
+
+	reports, err := network.Remove(e.conn, e.Name, nil)
+	if err != nil {
+		return fmt.Errorf("failed to remove network %q: %w", e.Name, err)
+	}
+	for _, r := range reports {
+		if r.Err != nil {
+			return fmt.Errorf("failed to remove network %q: %w", e.Name, r.Err)
+		}
+	}
+	return nil
+}
+
+// CreatePodEffect creates a new pod with the given name, annotations, labels, and port mappings.
+// The pod is always connected to the devpodman network.
+type CreatePodEffect struct {
+	conn         EngineConnection
+	Name         string
+	Annotations  map[string]string
+	Labels       map[string]string
+	PortMappings []nettypes.PortMapping
+}
+
+func NewCreatePodEffect(conn EngineConnection, name string, annotations, labels map[string]string, portMappings []nettypes.PortMapping) effects.Effect {
+	return CreatePodEffect{conn: conn, Name: name, Annotations: annotations, Labels: labels, PortMappings: portMappings}
 }
 
 func (e CreatePodEffect) Apply() error {
 	s := specgen.NewPodSpecGenerator()
 	s.Name = e.Name
 	s.Labels = e.Labels
+	s.PortMappings = e.PortMappings
+	s.NetNS = specgen.Namespace{NSMode: specgen.Bridge}
+	s.Networks = map[string]nettypes.PerNetworkOptions{
+		devpodmanNetwork: {},
+	}
 
 	if v, ok := e.Annotations["io.podman.annotations.userns"]; ok && v == "keep-id" {
 		s.Userns.NSMode = specgen.KeepID

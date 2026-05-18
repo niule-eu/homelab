@@ -2,6 +2,7 @@ ARG KUBECTL_IMAGE
 ARG KYVERNO_KYVERNO_TAG
 ARG ASTRAL_SH_UV_TAG
 ARG NIULE_EU_HLCLI_TAG
+ARG MIKEFARAH_YQ_TAG_NO_V
 
 # Download golang and extract to tmp
 FROM curlimages/curl:latest as golang
@@ -128,6 +129,8 @@ FROM $KUBECTL_IMAGE as kubectl
 
 FROM ghcr.io/kyverno/kyverno-cli:$KYVERNO_KYVERNO_TAG as kyverno
 
+FROM docker.io/mikefarah/yq:$MIKEFARAH_YQ_TAG_NO_V as yq
+
 FROM ghcr.io/astral-sh/uv:$ASTRAL_SH_UV_TAG as astral_uv
 
 FROM ghcr.io/niule-eu/hlcli:$NIULE_EU_HLCLI_TAG as niule_hlcli
@@ -147,7 +150,7 @@ RUN dnf update -y && dnf install -y --setopt=install_weak_deps=False \
     gzip \
     butane \
     helm-0:3.19.0-1.fc43.x86_64 \
-    yq jq \
+    jq \
     openssl \
     which \
     make \
@@ -165,6 +168,7 @@ COPY --chown=root:root --chmod=0755 --from=sd /tmp/sd /usr/local/bin/
 COPY --chown=root:root --chmod=0644 --from=sd /tmp/completions/sd.bash /usr/share/bash-completion/completions/sd
 COPY --chown=root:root --chmod=0755 --from=kubectl /bin/kubectl /usr/local/bin/
 COPY --chown=root:root --chmod=0755 --from=kyverno /ko-app/kubectl-kyverno /usr/local/bin/kyverno
+COPY --chown=root:root --chmod=0755 --from=yq /usr/bin/yq /usr/local/bin/
 COPY --chown=root:root --chmod=0755 --from=flux /tmp/flux /usr/local/bin
 COPY --chown=root:root --chmod=0755 --from=astral_uv /uv /uvx /bin/
 COPY --chown=root:root --chmod=0755 --from=niule_hlcli /ko-app/hlcli /usr/local/bin

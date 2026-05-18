@@ -43,3 +43,6 @@
 - repo: cue
   owner: cue-lang
   pattern: 'linux_amd64.tar.gz$'
+- repo: yq
+  owner: mikefarah
+  pattern: 'yq_linux_amd64'

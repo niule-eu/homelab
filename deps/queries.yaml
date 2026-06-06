@@ -40,6 +40,10 @@
   owner: niule-eu
   pattern: 'linux.amd64$'
   checksums_pattern: 'checksums.txt'
+- repo: symat
+  owner: niule-eu
+  pattern: 'linux.amd64$'
+  checksums_pattern: 'checksums.txt'
 - repo: cue
   owner: cue-lang
   pattern: 'linux_amd64.tar.gz$'

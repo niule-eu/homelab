@@ -34,6 +34,21 @@ RUN <<EOF /bin/sh
     mv sops /tmp/sops
 EOF
 
+# Download sops and move to /tmp
+FROM curlimages/curl:latest as sops
+
+ARG RANCHER_CLI_TAG
+ARG RANCHER_CLI_URL
+ARG RANCHER_CLI_HASH
+
+RUN <<EOF /bin/sh
+    set -eux
+    curl -H "Accept: application/octet-stream" -Lo rancher-cli.tar.gz ${RANCHER_CLI_URL}
+    echo "${RANCHER_CLI_HASH} rancher-cli.tar.gz" | sha256sum -c
+    tar -C /tmp -xzf rancher-cli.tar.gz
+    mv /tmp/rancher-${RANCHER_CLI_TAG}/rancher /tmp/rancher
+EOF
+
 # Download opentofu and move to /tmp
 FROM curlimages/curl:latest as opentofu
 
@@ -180,6 +195,7 @@ COPY --chown=root:root --chmod=0755 --from=astral_uv /uv /uvx /bin/
 COPY --chown=root:root --chmod=0755 --from=niule_hlcli /ko-app/hlcli /usr/local/bin
 # COPY --chown=root:root --chmod=0755 --from=niule_symat /ko-app/symat /usr/local/bin
 COPY --chown=root:root --chmod=0755 --from=cue /tmp/cue /usr/local/bin
+COPY --chown=root:root --chmod=0755 --from=rancher /tmp/rancher /usr/local/bin
 
 # Add go to path and adjust permissons
 # Note the quotes around "EOF", they tell the container builder not to interpolate ARGs into the script

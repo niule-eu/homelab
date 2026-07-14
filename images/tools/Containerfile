@@ -35,7 +35,7 @@ RUN <<EOF /bin/sh
 EOF
 
 # Download sops and move to /tmp
-FROM curlimages/curl:latest as sops
+FROM curlimages/curl:latest as rancher
 
 ARG RANCHER_CLI_TAG
 ARG RANCHER_CLI_URL

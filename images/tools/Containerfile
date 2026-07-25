@@ -150,7 +150,7 @@ FROM ghcr.io/niule-eu/hlcli:$NIULE_EU_HLCLI_TAG as niule_hlcli
 
 # FROM ghcr.io/niule-eu/symat:$NIULE_EU_SYMAT_TAG as niule_symat
 
-FROM registry.fedoraproject.org/fedora-minimal:45
+FROM registry.fedoraproject.org/fedora-minimal:44
 
 ARG USERID
 ARG GROUPID
@@ -172,8 +172,13 @@ RUN dnf update -y && dnf install -y --setopt=install_weak_deps=False \
     vim \
     go-task \
     bind-utils \
-    unzip \
-    pcsc-lite-libs
+    unzip 
+
+RUN <<EOF /bin/bash
+    set -eux
+    dnf install -y fedora-repos-rawhide 
+    dnf install -y --releasever=rawhide pcsc-lite-libs
+EOF
 
 COPY --chown=root:root --chmod=0755 --from=golang /tmp/go /usr/local/go
 COPY --chown=root:root --chmod=0755 --from=sops /tmp/sops /usr/local/bin/

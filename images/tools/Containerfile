@@ -150,7 +150,7 @@ FROM ghcr.io/niule-eu/hlcli:$NIULE_EU_HLCLI_TAG as niule_hlcli
 
 # FROM ghcr.io/niule-eu/symat:$NIULE_EU_SYMAT_TAG as niule_symat
 
-FROM registry.fedoraproject.org/fedora-minimal:44
+FROM registry.fedoraproject.org/fedora-minimal:45
 
 ARG USERID
 ARG GROUPID
@@ -171,7 +171,6 @@ RUN dnf update -y && dnf install -y --setopt=install_weak_deps=False \
     make \
     vim \
     go-task \
-    wiggle \
     bind-utils \
     unzip \
     pcsc-lite-libs
